@@ -95,12 +95,11 @@ app.get('/register', (req, res) => {
     res.render('register', { error: null });
 });
 
-// ประมวลผลสมัครสมาชิก (แก้ไขให้ตรงกับโครงสร้างตารางและฟอร์มจริง)
+// ประมวลผลสมัครสมาชิก
 app.post('/register', async (req, res) => {
     const name = req.body.name || req.body.username;
     const { user_id, email, password, confirm_password } = req.body;
 
-    // เช็ครหัสผ่านว่าตรงกันไหม (ถ้าหน้าเว็บมีช่องยืนยันรหัสผ่าน)
     if (confirm_password && password !== confirm_password) {
         return res.render('register', { error: 'รหัสผ่านทั้งสองครั้งไม่ตรงกัน' });
     }
@@ -116,6 +115,7 @@ app.post('/register', async (req, res) => {
         res.render('register', { error: 'เกิดข้อผิดพลาด: User ID หรือ Email นี้ถูกใช้งานแล้ว' });
     }
 });
+
 // หน้าเข้าสู่ระบบ
 app.get('/login', (req, res) => {
     res.render('login', { error: null });
@@ -200,7 +200,7 @@ app.post('/checkout', async (req, res) => {
 
     try {
         const [result] = await db.query(
-            'INSERT INTO orders (user_id, user_email, total_price, status) VALUES (?, ?, ?, "pending")',
+            'INSERT INTO orders (user_id, user_email, total_price) VALUES (?, ?, ?)',
             [req.session.user.id, req.session.user.email, totalPrice]
         );
         const orderId = result.insertId;
