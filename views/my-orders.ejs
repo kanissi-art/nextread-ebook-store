@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>คำสั่งซื้อของฉัน - NEXTREAD</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #0f172a;
+            --text-sub: #64748b;
+            --accent-color: #2563eb;
+            --border-color: #e2e8f0;
+        }
+
+        body.dark-mode {
+            --bg-color: #0b1120;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --text-sub: #94a3b8;
+            --accent-color: #3b82f6;
+            --border-color: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        a.btn-back {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .order-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 15px;
+        }
+
+        .status-pending {
+            background: #fef08a;
+            color: #854d0e;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .status-approved {
+            background: #bbf7d0;
+            color: #166534;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .item-list {
+            list-style: none;
+        }
+
+        .item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .item:last-child {
+            border-bottom: none;
+        }
+
+        .download-btn {
+            display: inline-block;
+            margin-top: 6px;
+            color: var(--accent-color);
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .download-btn:hover {
+            text-decoration: underline;
+        }
+
+        .order-total {
+            text-align: right;
+            margin-top: 15px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>📦 คำสั่งซื้อของฉัน</h1>
+            <a href="/" class="btn-back">← กลับหน้าหลัก</a>
+        </header>
+
+        <% if (orders && orders.length > 0) { %>
+            <% orders.forEach(order => { %>
+                <div class="order-card">
+                    <div class="order-header">
+                        <div>
+                            <strong>คำสั่งซื้อ #<%= order.id %></strong>
+                            <div style="font-size: 0.85rem; color: var(--text-sub); margin-top: 2px;">
+                                <%= new Date(order.created_at).toLocaleString('th-TH') %>
+                            </div>
+                        </div>
+                        <div>
+                            <% if (order.status === 'approved') { %>
+                                <span class="status-approved">✅ ชำระเงินแล้ว (อนุมัติแล้ว)</span>
+                            <% } else { %>
+                                <span class="status-pending">⏳ รอผู้ดูแลระบบตรวจสอบ</span>
+                            <% } %>
+                        </div>
+                    </div>
+
+                    <ul class="item-list">
+                        <% order.items.forEach(item => { %>
+                            <li class="item">
+                                <div>
+                                    <strong><%= item.book_title %></strong>
+                                    <% if (order.status === 'approved') { %>
+                                        <br>
+                                        <a href="<%= item.ebook_url %>" target="_blank" class="download-btn">📖 คลิกอ่าน / ดาวน์โหลด E-Book</a>
+                                    <% } %>
+                                </div>
+                                <div>฿<%= item.price %></div>
+                            </li>
+                        <% }) %>
+                    </ul>
+
+                    <div class="order-total">
+                        ราคารวมสุทธิ: <span style="color: var(--accent-color);">฿<%= order.total_price %></span>
+                    </div>
+                </div>
+            <% }) %>
+        <% } else { %>
+            <p style="text-align: center; color: var(--text-sub); margin-top: 50px;">ยังไม่มีรายการคำสั่งซื้อ</p>
+        <% } %>
+    </div>
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+    </script>
+</body>
+</html>

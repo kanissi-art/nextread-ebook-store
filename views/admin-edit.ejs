@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>แก้ไขหนังสือ - NEXTREAD</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #0f172a;
+            --accent-color: #2563eb;
+            --border-color: #e2e8f0;
+        }
+
+        body.dark-mode {
+            --bg-color: #0b1120;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --border-color: #334155;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container { max-width: 600px; margin: 3rem auto; padding: 0 1rem; }
+
+        .card {
+            background-color: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .form-group { display: flex; flex-direction: column; margin-bottom: 1rem; }
+        label { font-weight: bold; margin-bottom: 0.3rem; font-size: 0.9rem; }
+        input, select, textarea {
+            padding: 0.6rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .btn-submit {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 1rem;
+        }
+
+        .btn-cancel {
+            display: block;
+            text-align: center;
+            margin-top: 1rem;
+            color: #64748b;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>✏️ แก้ไขข้อมูลหนังสือ</h2>
+        <div class="card">
+            <form action="/admin/edit/<%= book.id %>" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label>ชื่อหนังสือ</label>
+                    <input type="text" name="title" value="<%= book.title %>" required>
+                </div>
+                <div class="form-group">
+                    <label>ชื่อผู้แต่ง</label>
+                    <input type="text" name="author" value="<%= book.author %>" required>
+                </div>
+                <div class="form-group">
+                    <label>ราคา (บาท)</label>
+                    <input type="number" step="0.01" name="price" value="<%= book.price %>" required>
+                </div>
+                <div class="form-group">
+                    <label>หมวดหมู่</label>
+                    <select name="category" required>
+                        <option value="การออกแบบ" <%= book.category === 'การออกแบบ' ? 'selected' : '' %>>การออกแบบ</option>
+                        <option value="เทคโนโลยี" <%= book.category === 'เทคโนโลยี' ? 'selected' : '' %>>เทคโนโลยี</option>
+                        <option value="ไลฟ์สไตล์" <%= book.category === 'ไลฟ์สไตล์' ? 'selected' : '' %>>ไลฟ์สไตล์</option>
+                        <option value="วิทยาการข้อมูล" <%= book.category === 'วิทยาการข้อมูล' ? 'selected' : '' %>>วิทยาการข้อมูล</option>
+                        <option value="จิตวิทยา" <%= book.category === 'จิตวิทยา' ? 'selected' : '' %>>จิตวิทยา</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>🖼️ อัปโหลดรูปภาพปกใหม่ (จากในเครื่อง)</label>
+                    <input type="file" name="cover_image_file" accept="image/*">
+                </div>
+                <div class="form-group">
+                    <label>🔗 URL รูปภาพเดิม/สำรอง</label>
+                    <input type="text" name="cover_image_url" value="<%= book.cover_image %>">
+                </div>
+                <div class="form-group">
+                    <label>เรื่องย่อ / รายละเอียดหนังสือ</label>
+                    <textarea name="description" rows="4"><%= book.description %></textarea>
+                </div>
+                <button type="submit" class="btn-submit">อัปเดตข้อมูล</button>
+                <a href="/admin" class="btn-cancel">ยกเลิก</a>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
+    </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>สั่งซื้อสำเร็จ - NEXTREAD</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; padding: 2.5rem; border-radius: 12px; border: 1px solid #e2e8f0; text-align: center; max-width: 480px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .icon { font-size: 4rem; margin-bottom: 1rem; }
+        h1 { color: #d97706; margin-bottom: 0.5rem; }
+        p { color: #64748b; line-height: 1.6; }
+        .btn { display: inline-block; background: #2563eb; color: white; padding: 0.8rem 1.2rem; border-radius: 8px; text-decoration: none; margin-top: 1rem; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon">⏳</div>
+        <h1>สั่งซื้อสำเร็จ! (รอการอนุมัติ)</h1>
+        <p>คำสั่งซื้อ <strong>#<%= orderId %></strong> อยู่ในระหว่างการตรวจสอบสลิป/อนุมัติจากผู้ดูแลระบบ</p>
+        <p>เมื่อผู้ดูแลระบบทำการอนุมัติแล้ว ระบบจะส่งลิงก์สำหรับเข้าถึง E-Book ไปยังอีเมล <strong><%= email %></strong> ของคุณโดยอัตโนมัติทันทีครับ!</p>
+        <a href="/" class="btn">← กลับสู่หน้าร้านค้า</a>
+    </div>
+</body>
+</html>

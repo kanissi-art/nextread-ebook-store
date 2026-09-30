@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>เข้าสู่ระบบ - NEXTREAD</title>
+    <style>
+        body { font-family: sans-serif; background: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 380px; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        .btn { width: 100%; padding: 10px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .error { color: #ef4444; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🔑 เข้าสู่ระบบ</h2>
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="error"><%= error %></div>
+        <% } %>
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <label>รหัสผู้ใช้ (User ID)</label>
+                <input type="text" name="user_id" required placeholder="กรอก User ID ของคุณ">
+            </div>
+            <div class="form-group">
+                <label>รหัสผ่าน</label>
+                <input type="password" name="password" required>
+            </div>
+            <button type="submit" class="btn">เข้าสู่ระบบ</button>
+        </form>
+        <p style="margin-top: 1rem; text-align: center;">ยังไม่มีบัญชี? <a href="/register">สมัครสมาชิก</a></p>
+    </div>
+</body>
+</html>

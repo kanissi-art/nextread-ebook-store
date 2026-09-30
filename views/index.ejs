@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEXTREAD - ร้านหนังสือออนไลน์</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #0f172a;
+            --text-sub: #64748b;
+            --accent-color: #2563eb;
+            --border-color: #e2e8f0;
+        }
+
+        body.dark-mode {
+            --bg-color: #0b1120;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --text-sub: #94a3b8;
+            --accent-color: #3b82f6;
+            --border-color: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .nav-links a {
+            color: var(--text-color);
+            text-decoration: none;
+            font-weight: 500;
+            padding: 6px 12px;
+            border-radius: 6px;
+        }
+
+        .nav-links a:hover {
+            background-color: var(--border-color);
+        }
+
+        .btn-admin {
+            background-color: var(--accent-color) !important;
+            color: white !important;
+            font-weight: bold;
+        }
+
+        .btn-logout {
+            color: #ef4444 !important;
+        }
+
+        .btn-theme {
+            background: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .hero {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .hero p {
+            color: var(--text-sub);
+        }
+
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 2rem;
+        }
+
+        .book-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .book-card img {
+            width: 100%;
+            height: 280px;
+            object-fit: cover;
+        }
+
+        .book-info {
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .book-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 0.3rem;
+        }
+
+        .book-author {
+            font-size: 0.9rem;
+            color: var(--text-sub);
+            margin-bottom: 0.8rem;
+        }
+
+        .book-price {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin-top: auto;
+            margin-bottom: 1rem;
+        }
+
+        .book-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            display: inline-block;
+            text-align: center;
+            padding: 8px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            flex: 1;
+        }
+
+        .btn-primary {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-outline {
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        .btn-outline:hover {
+            background-color: var(--border-color);
+        }
+
+        .cart-badge {
+            background-color: #ef4444;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <a href="/" class="logo">📚 NEXTREAD</a>
+        
+        <div class="nav-links">
+            <a href="/cart">🛒 ตะกร้าสินค้า <% if (cart && cart.length > 0) { %><span class="cart-badge"><%= cart.reduce((sum, i) => sum + i.quantity, 0) %></span><% } %></a>
+            
+            <% if (user) { %>
+                <!-- ปุ่มชั้นหนังสือของฉันที่เพิ่มเข้ามา -->
+                <a href="/my-books" style="color: #f59e0b; font-weight: bold;">📚 ชั้นหนังสือของฉัน</a>
+                <a href="/my-orders">📦 คำสั่งซื้อของฉัน</a>
+                <span>👤 สวัสดี, <%= user.name %></span>
+                
+                <!-- แสดงเฉพาะเมื่อเป็น Admin เท่านั้น -->
+                <% if (isAdmin) { %>
+                    <a href="/admin" class="btn-admin">⚙️ แอดมิน</a>
+                <% } %>
+                
+                <a href="/logout" class="btn-logout">ออกจากระบบ</a>
+            <% } else { %>
+                <a href="/login">เข้าสู่ระบบ</a>
+                <a href="/register">สมัครสมาชิก</a>
+            <% } %>
+
+            <button class="btn-theme" id="themeToggle" onclick="toggleTheme()">🌙 / ☀️</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="hero">
+            <h1>คลังหนังสือ E-Book คุณภาพ</h1>
+            <p>เลือกอ่านหนังสือที่คุณชื่นชอบได้ทุกที่ ทุกเวลา</p>
+        </div>
+
+        <div class="book-grid">
+            <% if (books && books.length > 0) { %>
+                <% books.forEach(book => { %>
+                    <div class="book-card">
+                        <img src="<%= book.cover_image %>" alt="<%= book.title %>" onerror="this.src='https://via.placeholder.com/200x280?text=No+Cover'">
+                        <div class="book-info">
+                            <div class="book-title"><%= book.title %></div>
+                            <div class="book-author">ผู้แต่ง: <%= book.author %></div>
+                            <div class="book-price">฿<%= book.price %></div>
+                            <div class="book-actions">
+                                <a href="/book/<%= book.id %>" class="btn btn-outline">รายละเอียด</a>
+                                <form action="/cart/add/<%= book.id %>" method="POST" style="flex: 1;">
+                                    <button type="submit" class="btn btn-primary" style="width: 100%;">หยิบใส่ตะกร้า</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                <% }) %>
+            <% } else { %>
+                <p style="text-align: center; grid-column: 1 / -1; color: var(--text-sub);">ยังไม่มีหนังสือในระบบ</p>
+            <% } %>
+        </div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        }
+
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+    </script>
+</body>
+</html>

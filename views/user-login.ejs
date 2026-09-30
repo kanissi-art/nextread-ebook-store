@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบลูกค้า - NEXTREAD</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #0f172a;
+            --accent-color: #2563eb;
+            --border-color: #e2e8f0;
+            --danger-color: #ef4444;
+        }
+        body.dark-mode {
+            --bg-color: #0b1120;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --border-color: #334155;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background-color: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        h2 { text-align: center; margin-bottom: 1.5rem; color: var(--accent-color); }
+        .form-group { margin-bottom: 1.2rem; }
+        label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 0.8rem;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+        .error-msg {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+            padding: 0.8rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+        .links { text-align: center; margin-top: 1.5rem; font-size: 0.9rem; }
+        .links a { color: var(--accent-color); text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>👤 เข้าสู่ระบบลูกค้า</h2>
+        <% if (typeof error !== 'undefined' && error) { %>
+            <div class="error-msg"><%= error %></div>
+        <% } %>
+        <form action="/user-login" method="POST">
+            <div class="form-group">
+                <label>อีเมล</label>
+                <input type="email" name="email" required placeholder="somchai@example.com">
+            </div>
+            <div class="form-group">
+                <label>รหัสผ่าน</label>
+                <input type="password" name="password" required placeholder="••••••••">
+            </div>
+            <button type="submit" class="btn-submit">เข้าสู่ระบบ</button>
+        </form>
+        <div class="links">
+            ยังไม่มีบัญชี? <a href="/register">สมัครสมาชิก</a> | <a href="/">กลับหน้าหลัก</a>
+        </div>
+    </div>
+    <script>
+        if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
+    </script>
+</body>
+</html>
