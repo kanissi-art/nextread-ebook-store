@@ -95,11 +95,15 @@ app.get('/register', (req, res) => {
     res.render('register', { error: null });
 });
 
-// ประมวลผลสมัครสมาชิก (แก้ไขส่วนนี้เพื่อให้ใช้งานได้ 100%)
+// ประมวลผลสมัครสมาชิก (แก้ไขให้ตรงกับโครงสร้างตารางและฟอร์มจริง)
 app.post('/register', async (req, res) => {
-    // รองรับทั้ง name="name" และ name="username" เผื่อชื่อในหน้า HTML ไม่ตรงกัน
     const name = req.body.name || req.body.username;
-    const { user_id, email, password } = req.body;
+    const { user_id, email, password, confirm_password } = req.body;
+
+    // เช็ครหัสผ่านว่าตรงกันไหม (ถ้าหน้าเว็บมีช่องยืนยันรหัสผ่าน)
+    if (confirm_password && password !== confirm_password) {
+        return res.render('register', { error: 'รหัสผ่านทั้งสองครั้งไม่ตรงกัน' });
+    }
 
     try {
         await db.query(
@@ -109,10 +113,9 @@ app.post('/register', async (req, res) => {
         res.redirect('/login');
     } catch (err) {
         console.error(err);
-        res.render('register', { error: 'มีผู้ใช้งานนี้ในระบบแล้ว หรือกรอกข้อมูลไม่ครบ' });
+        res.render('register', { error: 'เกิดข้อผิดพลาด: User ID หรือ Email นี้ถูกใช้งานแล้ว' });
     }
 });
-
 // หน้าเข้าสู่ระบบ
 app.get('/login', (req, res) => {
     res.render('login', { error: null });
