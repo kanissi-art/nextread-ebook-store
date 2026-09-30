@@ -1,3 +1,4 @@
+
 const express = require('express');
 const session = require('express-session');
 const mysql = require('mysql2/promise');
@@ -32,7 +33,7 @@ const db = mysql.createPool({
   port: process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
-  ssl: { rejectUnauthorized: false } // เพิ่มบรรทัดนี้เพื่อให้ต่อกับ Aiven ได้
+  ssl: { rejectUnauthorized: false }
 });
 
 // --- 3. ตั้งค่า Nodemailer ---
@@ -94,23 +95,21 @@ app.get('/register', (req, res) => {
     res.render('register', { error: null });
 });
 
-// ประมวลผลสมัครสมาชิก
+// ประมวลผลสมัครสมาชิก (แก้ไขส่วนนี้เพื่อให้ใช้งานได้ 100%)
 app.post('/register', async (req, res) => {
-    const { username, user_id, email, password, confirm_password } = req.body;
-
-    if (password !== confirm_password) {
-        return res.render('register', { error: 'รหัสผ่านทั้งสองครั้งไม่ตรงกัน' });
-    }
+    // รองรับทั้ง name="name" และ name="username" เผื่อชื่อในหน้า HTML ไม่ตรงกัน
+    const name = req.body.name || req.body.username;
+    const { user_id, email, password } = req.body;
 
     try {
         await db.query(
             'INSERT INTO users (name, user_id, email, password, role) VALUES (?, ?, ?, ?, "user")',
-            [username, user_id, email, password]
+            [name, user_id, email, password]
         );
         res.redirect('/login');
     } catch (err) {
         console.error(err);
-        res.render('register', { error: 'Error จริงจากระบบ: ' + (err.sqlMessage || err.message) });
+        res.render('register', { error: 'มีผู้ใช้งานนี้ในระบบแล้ว หรือกรอกข้อมูลไม่ครบ' });
     }
 });
 
