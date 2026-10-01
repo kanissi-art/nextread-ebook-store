@@ -8,17 +8,23 @@
         .container { max-width: 1100px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
         .section { background: white; padding: 1.5rem; border-radius: 10px; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 0.9rem; }
         th, td { border: 1px solid #e2e8f0; padding: 0.75rem; text-align: left; }
         th { background-color: #f1f5f9; }
         .badge-pending { background: #fef3c7; color: #d97706; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
         .badge-approved { background: #d1fae5; color: #059669; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
         .btn-approve { background: #10b981; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .btn-add { background: #2563eb; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-add { background: #2563eb; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .form-row { margin-bottom: 10px; width: 48%; display: inline-block; vertical-align: top; }
         .form-full { margin-bottom: 10px; width: 98%; }
         label { display: block; font-size: 0.85rem; font-weight: bold; margin-bottom: 3px; color: #475569; }
-        input[type="text"], input[type="number"], input[type="file"], textarea { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; }
+        input[type="text"], input[type="number"], input[type="file"], textarea, select { padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; }
+        
+        /* สไตล์เสริมสำหรับ Dashboard */
+        .dash-cards { display: flex; gap: 1rem; margin-bottom: 2rem; }
+        .card { background: white; padding: 1.5rem; border-radius: 10px; flex: 1; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: center; border-top: 4px solid #2563eb; }
+        .card h3 { margin: 0; color: #64748b; font-size: 1rem; }
+        .card p { margin: 10px 0 0 0; font-size: 2rem; font-weight: bold; color: #0f172a; }
     </style>
 </head>
 <body>
@@ -28,16 +34,34 @@
             <a href="/logout" style="color: #ef4444; font-weight: bold; text-decoration: none;">ออกจากระบบ</a>
         </div>
 
-        <!-- ⏳ ส่วนที่ 1: ตารางอนุมัติออเดอร์จากลูกค้า -->
+        <!-- 📊 ส่วนที่ 0: Dashboard รายงานวิเคราะห์ข้อมูล -->
+        <div class="dash-cards">
+            <div class="card">
+                <h3>💰 ยอดขายรวม (ที่อนุมัติแล้ว)</h3>
+                <p>฿<%= dashboard.revenue.toLocaleString('th-TH') %></p>
+            </div>
+            <div class="card">
+                <h3>👥 จำนวนสมาชิกทั้งหมด</h3>
+                <p><%= dashboard.users %> บัญชี</p>
+            </div>
+            <div class="card">
+                <h3>📚 หนังสือในระบบ</h3>
+                <p><%= dashboard.books %> เล่ม</p>
+            </div>
+        </div>
+
+        <!-- ⏳ ส่วนที่ 1: ตารางอนุมัติออเดอร์ + ปุ่ม EXPORT -->
         <div class="section">
-            <h2>📥 รายการคำสั่งซื้อที่รอการอนุมัติ</h2>
+            <h2 style="display: flex; justify-content: space-between; align-items: center; margin-top: 0;">
+                📥 รายการคำสั่งซื้อ & รายงานวิเคราะห์
+                <a href="/admin/export/orders" class="btn-add" style="text-decoration: none;">📊 Export เป็น CSV</a>
+            </h2>
             <% if (orders && orders.length > 0) { %>
                 <table>
                     <thead>
                         <tr>
                             <th>ออเดอร์ #</th>
                             <th>อีเมลลูกค้า</th>
-                            <th>รายการหนังสือ</th>
                             <th>ยอดรวม</th>
                             <th>สถานะ</th>
                             <th>การกระทำ</th>
@@ -48,13 +72,6 @@
                             <tr>
                                 <td>#<%= order.id %></td>
                                 <td><%= order.user_email %></td>
-                                <td>
-                                    <ul>
-                                        <% (order.items || []).forEach(item => { %>
-                                         <li><%= item.book_title %></li>
-                                        <% }) %>
-                                     </ul>
-                                </td>
                                 <td>฿<%= order.total_price %></td>
                                 <td>
                                     <% if (order.status === 'pending') { %>
@@ -69,7 +86,7 @@
                                             <button type="submit" class="btn-approve">✔ กดอนุมัติ & ส่งอีเมล</button>
                                         </form>
                                     <% } else { %>
-                                        <span style="color: #64748b;">จัดส่งแล้ว</span>
+                                        <span style="color: #64748b;">ดำเนินการแล้ว</span>
                                     <% } %>
                                 </td>
                             </tr>
@@ -81,7 +98,26 @@
             <% } %>
         </div>
 
-        <!-- 📚 ส่วนที่ 2: จัดการเพิ่ม/แก้ไข/ลบหนังสือ -->
+        <!-- 🗂 ส่วนที่ 2: จัดการหมวดหมู่ -->
+        <div class="section">
+            <h2>🗂 จัดการหมวดหมู่หนังสือ</h2>
+            <form action="/admin/categories/add" method="POST" style="margin-bottom: 1rem;">
+                <input type="text" name="name" placeholder="ชื่อหมวดหมู่ใหม่..." required style="width: 300px;">
+                <button type="submit" class="btn-add">เพิ่มหมวดหมู่</button>
+            </form>
+            
+            <% if (categories && categories.length > 0) { %>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <% categories.forEach(cat => { %>
+                        <span style="background: #e2e8f0; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem;"><%= cat.name %></span>
+                    <% }) %>
+                </div>
+            <% } else { %>
+                <p style="font-size: 0.85rem; color: #64748b;">ยังไม่มีหมวดหมู่ในระบบ</p>
+            <% } %>
+        </div>
+
+        <!-- 📚 ส่วนที่ 3: จัดการเพิ่ม/แก้ไข/ลบหนังสือ -->
         <div class="section">
             <h2>➕ เพิ่มหนังสือใหม่</h2>
             <form action="/admin/books/add" method="POST" enctype="multipart/form-data">
@@ -101,11 +137,16 @@
                 </div>
                 <div class="form-row">
                     <label>หมวดหมู่</label>
-                    <input type="text" name="category" placeholder="หมวดหมู่" style="width: 100%;">
+                    <select name="category_id" style="width: 105%;">
+                        <option value="">-- เลือกหมวดหมู่ --</option>
+                        <% categories.forEach(cat => { %>
+                            <option value="<%= cat.id %>"><%= cat.name %></option>
+                        <% }) %>
+                    </select>
                 </div>
 
                 <div class="form-row" style="margin-right: 2%;">
-                    <label>อัปโหลดรูปปก (Cover Image)</label>
+                    <label>อัปโหลดรูปปก (Cover)</label>
                     <input type="file" name="cover_image" accept="image/*" style="width: 100%;">
                 </div>
                 <div class="form-row">
@@ -114,26 +155,15 @@
                 </div>
 
                 <div class="form-full">
-                    <label>อัปโหลดไฟล์ E-Book (PDF)</label>
-                    <input type="file" name="ebook_file" accept=".pdf" style="width: 100%;">
+                    <button type="submit" class="btn-add">เพิ่มหนังสือลงคลัง</button>
                 </div>
-
-                <div class="form-full">
-                    <label>รายละเอียดหนังสือ</label>
-                    <textarea name="description" placeholder="รายละเอียดหนังสือ..." style="width: 100%; height: 70px;"></textarea>
-                </div>
-
-                <button type="submit" class="btn-add">เพิ่มหนังสือ</button>
             </form>
-        </div>
-
-        <div class="section">
-            <h2>📚 รายการหนังสือในระบบ</h2>
-            <table>
+            
+            <table style="margin-top: 1rem;">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>ชื่อหนังสือ</th>
+                        <th>หมวดหมู่</th>
                         <th>ราคา</th>
                         <th>จัดการ</th>
                     </tr>
@@ -141,8 +171,8 @@
                 <tbody>
                     <% books.forEach(book => { %>
                         <tr>
-                            <td><%= book.id %></td>
                             <td><%= book.title %></td>
+                            <td><%= book.category_name || '-' %></td>
                             <td>฿<%= book.price %></td>
                             <td>
                                 <a href="/admin/books/edit/<%= book.id %>">แก้ไข</a> | 
@@ -153,6 +183,41 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- 👥 ส่วนที่ 4: จัดการผู้ใช้ (ตั้งค่าสิทธิ์ Admin) -->
+        <div class="section">
+            <h2>👥 จัดการผู้ใช้งานระบบ</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>ชื่อ</th>
+                        <th>อีเมล</th>
+                        <th>บทบาท (Role)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% users.forEach(u => { %>
+                        <tr>
+                            <td><%= u.user_id %></td>
+                            <td><%= u.name %></td>
+                            <td><%= u.email %></td>
+                            <td>
+                                <form action="/admin/users/role/<%= u.id %>" method="POST">
+                                    <select name="role" onchange="this.form.submit()" style="padding: 4px; border-radius: 4px;">
+                                        <option value="user" <%= u.role === 'user' ? 'selected' : '' %>>ลูกค้า (User)</option>
+                                        <option value="admin" <%= u.role === 'admin' ? 'selected' : '' %>>ผู้ดูแล (Admin)</option>
+                                    </select>
+                                </form>
+                            </td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+
     </div>
 </body>
 </html>
+
+

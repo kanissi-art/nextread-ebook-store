@@ -290,54 +290,96 @@ app.get('/read/:id', async (req, res) => {
     }
 });
 
-// --- 6. ROUTES สำหรับ ADMIN (จัดการหนังสือ + อนุมัติออเดอร์) ---
+// --- 6. ROUTES สำหรับ ADMIN (จัดการหนังสือ + อนุมัติออเดอร์ + ฟังก์ชันใหม่) ---
 
-// หน้าควบคุม Admin
+// หน้าควบคุม Admin (เพิ่ม Dashboard, Users, Categories)
 app.get('/admin', async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
 
     try {
-        const [orders] = await db.query(
-            'SELECT o.*, u.name as user_name, u.email FROM orders o JOIN users u ON o.user_id = u.id ORDER BY o.id DESC'
-        );
+        // 1. ดึงสถิติ Dashboard
+        const [[totalSales]] = await db.query("SELECT SUM(total_price) as sum FROM orders WHERE status = 'approved'");
+        const [[userCount]] = await db.query("SELECT COUNT(id) as count FROM users");
+        const [[bookCount]] = await db.query("SELECT COUNT(id) as count FROM books");
+        const dashboard = {
+            revenue: totalSales.sum || 0,
+            users: userCount.count || 0,
+            books: bookCount.count || 0
+        };
 
+        // 2. ดึงออเดอร์
+        const [orders] = await db.query('SELECT o.*, u.name as user_name, u.email FROM orders o JOIN users u ON o.user_id = u.id ORDER BY o.id DESC');
         for (let order of orders) {
-            const [items] = await db.query(
-                'SELECT oi.*, b.title as book_title, b.ebook_url FROM order_items oi JOIN books b ON oi.book_id = b.id WHERE oi.order_id = ?',
-                [order.id]
-            );
+            const [items] = await db.query('SELECT oi.*, b.title as book_title FROM order_items oi JOIN books b ON oi.book_id = b.id WHERE oi.order_id = ?', [order.id]);
             order.items = items || [];
         }
 
-        const [books] = await db.query('SELECT * FROM books ORDER BY id DESC');
-        res.render('admin', { orders, books });
+        // 3. ดึงหนังสือ หมวดหมู่ และผู้ใช้
+        const [books] = await db.query('SELECT b.*, c.name as category_name FROM books b LEFT JOIN categories c ON b.category_id = c.id ORDER BY b.id DESC');
+        const [categories] = await db.query('SELECT * FROM categories ORDER BY id DESC');
+        const [users] = await db.query('SELECT id, name, user_id, email, role FROM users ORDER BY id DESC');
+
+        res.render('admin', { orders, books, categories, users, dashboard });
     } catch (err) {
         console.error(err);
         res.status(500).send('Admin Error');
     }
 });
 
-// Admin เพิ่มหนังสือใหม่
+// Admin เพิ่มหนังสือใหม่ (รองรับหมวดหมู่)
 app.post('/admin/books/add', upload.fields([
     { name: 'cover_image', maxCount: 1 },
     { name: 'ebook_file', maxCount: 1 }
 ]), async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
-
-    const { title, author, price, description } = req.body;
+    const { title, author, price, description, category_id } = req.body;
     const coverImage = req.files['cover_image'] ? '/uploads/' + req.files['cover_image'][0].filename : (req.body.cover_url || '');
     const ebookUrl = req.files['ebook_file'] ? '/uploads/' + req.files['ebook_file'][0].filename : (req.body.ebook_url || '');
 
     try {
         await db.query(
-            'INSERT INTO books (title, author, price, description, cover_image, ebook_url) VALUES (?, ?, ?, ?, ?, ?)',
-            [title, author, price, description, coverImage, ebookUrl]
+            'INSERT INTO books (title, author, price, description, cover_image, ebook_url, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [title, author, price, description, coverImage, ebookUrl, category_id || null]
         );
         res.redirect('/admin');
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Error adding book');
-    }
+    } catch (err) { console.error(err); res.status(500).send('Error'); }
+});
+
+// --- ฟังก์ชันใหม่: จัดการหมวดหมู่ ---
+app.post('/admin/categories/add', async (req, res) => {
+    if (!req.session.isAdmin) return res.redirect('/');
+    try {
+        await db.query('INSERT INTO categories (name) VALUES (?)', [req.body.name]);
+        res.redirect('/admin');
+    } catch (err) { console.error(err); res.status(500).send('Error'); }
+});
+
+// --- ฟังก์ชันใหม่: อัปเดตสิทธิ์ผู้ใช้ (Admin/User) ---
+app.post('/admin/users/role/:id', async (req, res) => {
+    if (!req.session.isAdmin) return res.redirect('/');
+    try {
+        await db.query('UPDATE users SET role = ? WHERE id = ?', [req.body.role, req.params.id]);
+        res.redirect('/admin');
+    } catch (err) { console.error(err); res.status(500).send('Error'); }
+});
+
+// --- ฟังก์ชันใหม่: ระบบ Export เป็น CSV ---
+app.get('/admin/export/orders', async (req, res) => {
+    if (!req.session.isAdmin) return res.redirect('/');
+    try {
+        const [orders] = await db.query("SELECT id, user_email, total_price, status, created_at FROM orders ORDER BY id DESC");
+        
+        let csv = 'Order ID,Customer Email,Total Price,Status,Date\n';
+        orders.forEach(row => {
+            const date = row.created_at ? new Date(row.created_at).toLocaleString('th-TH') : '';
+            csv += `row.id,{row.user_email},row.totalprice,{row.status},${date}\n`;
+        });
+        
+        // ใส่ \uFEFF ให้ Excel อ่านภาษาไทยได้ไม่เพี้ยน
+        res.header('Content-Type', 'text/csv; charset=utf-8');
+        res.attachment('sales_report.csv');
+        res.send('\uFEFF' + csv);
+    } catch (err) { console.error(err); res.status(500).send('Error Exporting'); }
 });
 
 // Admin หน้าแก้ไขหนังสือ
@@ -482,3 +524,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log('Server running at http://localhost:' + PORT);
 });
+
+
