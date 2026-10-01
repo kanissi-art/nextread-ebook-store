@@ -242,6 +242,39 @@
             <h1>คลังหนังสือ E-Book คุณภาพ</h1>
             <p>เลือกอ่านหนังสือที่คุณชื่นชอบได้ทุกที่ ทุกเวลา</p>
         </div>
+        <!-- ระบบค้นหาและกรองหมวดหมู่ -->
+        <div style="max-width: 800px; margin: 0 auto 2rem auto; padding: 0 1rem;">
+            <form action="/" method="GET" style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                
+                <!-- กล่องค้นหาจากชื่อเรื่อง / ผู้แต่ง -->
+                <input type="text" name="search" placeholder="🔍 ค้นหาชื่อหนังสือ, ผู้แต่ง..." 
+                       value="<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>"
+                       style="padding: 10px 15px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; flex: 1; min-width: 200px; outline: none;">
+                
+                <!-- ดรอปดาวน์เลือกหมวดหมู่ -->
+                <select name="category" style="padding: 10px 15px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; min-width: 150px; outline: none;">
+                    <option value="">📁 ทุกหมวดหมู่</option>
+                    <% if (typeof categories !== 'undefined') { %>
+                        <% categories.forEach(cat => { %>
+                            <option value="<%= cat.id %>" <%= (typeof categoryFilter !== 'undefined' && categoryFilter == cat.id) ? 'selected' : '' %>>
+                                <%= cat.name %>
+                            </option>
+                        <% }) %>
+                    <% } %>
+                </select>
+
+                <!-- ปุ่มค้นหาและล้างค่า -->
+                <button type="submit" style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    ค้นหา
+                </button>
+                <a href="/" style="padding: 10px 15px; background: #475569; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; display: flex; align-items: center;">
+                    ล้างค่า
+                </a>
+            </form>
+        </div>
+        <!-- จบระบบค้นหา -->
+
+
 
         <div class="book-grid">
             <% if (books && books.length > 0) { %>

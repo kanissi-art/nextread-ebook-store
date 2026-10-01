@@ -66,11 +66,37 @@ app.use((req, res, next) => {
 
 // --- 5. ROUTES สำหรับฝั่งผู้ใช้งาน ---
 
-// หน้าหลัก แสดงรายการหนังสือ
+// หน้าหลัก แสดงรายการหนังสือ + ระบบค้นหาและจัดหมวดหมู่
 app.get('/', async (req, res) => {
     try {
-        const [books] = await db.query('SELECT * FROM books ORDER BY id DESC');
-        res.render('index', { books });
+        let searchQuery = req.query.search || '';
+        let categoryFilter = req.query.category || '';
+        
+        // ดึงหมวดหมู่ทั้งหมดไปแสดงใน Dropdown
+        const [categories] = await db.query('SELECT * FROM categories ORDER BY name ASC');
+        
+        // สร้างคำสั่ง SQL สำหรับการค้นหา
+        let query = 'SELECT b.*, c.name as category_name FROM books b LEFT JOIN categories c ON b.category_id = c.id WHERE 1=1';
+        let queryParams = [];
+
+        // ถ้ามีการพิมพ์ค้นหา
+        if (searchQuery) {
+            query += ' AND (b.title LIKE ? OR b.author LIKE ?)';
+            queryParams.push(`%\({searchQuery}%`, `%\){searchQuery}%`);
+        }
+
+        // ถ้ามีการเลือกหมวดหมู่
+        if (categoryFilter) {
+            query += ' AND b.category_id = ?';
+            queryParams.push(categoryFilter);
+        }
+
+        query += ' ORDER BY b.id DESC';
+
+        const [books] = await db.query(query, queryParams);
+        
+        // ส่งตัวแปรทั้งหมดไปที่หน้า index.ejs
+        res.render('index', { books, categories, searchQuery, categoryFilter });
     } catch (err) {
         console.error(err);
         res.status(500).send('Database Error');
