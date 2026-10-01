@@ -105,7 +105,7 @@ app.post('/register', async (req, res) => {
 
     try {
         await db.query(
-            'INSERT INTO users (name, user_id, email, password, role) VALUES (?, ?, ?, ?, "user")',
+            "INSERT INTO users (name, user_id, email, password, role) VALUES (?, ?, ?, ?, 'user')",
             [name, user_id, email, password]
         );
         res.redirect('/login');
@@ -254,7 +254,7 @@ app.get('/my-books', async (req, res) => {
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
             JOIN books b ON oi.book_id = b.id
-            WHERE o.user_id = ? AND o.status = "approved"
+            WHERE o.user_id = ? AND o.status = 'approved'
             GROUP BY b.id, b.title, b.author, b.cover_image, b.ebook_url
             ORDER BY purchase_date DESC
         `, [req.session.user.id]);
@@ -276,7 +276,7 @@ app.get('/read/:id', async (req, res) => {
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
             JOIN books b ON oi.book_id = b.id
-            WHERE o.user_id = ? AND b.id = ? AND o.status = "approved"
+            WHERE o.user_id = ? AND b.id = ? AND o.status = 'approved'
         `, [req.session.user.id, req.params.id]);
 
         if (rows.length === 0) {
@@ -397,7 +397,7 @@ app.post(['/admin/approve-order/:id', '/admin/orders/approve/:id'], async (req, 
 
     try {
         // 1. อนุมัติสถานะออเดอร์ในฐานข้อมูลก่อน
-        await db.query('UPDATE orders SET status = "approved" WHERE id = ?', [orderId]);
+        await db.query("UPDATE orders SET status = 'approved' WHERE id = ?", [orderId]);
 
         // 2. สั่ง Redirect กลับหน้า Admin ทันที! (ไม่รอให้อีเมลส่งเสร็จ)
         res.redirect('/admin');
