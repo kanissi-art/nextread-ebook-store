@@ -1,4 +1,3 @@
-
 const express = require('express');
 const session = require('express-session');
 const mysql = require('mysql2/promise');
@@ -391,71 +390,80 @@ app.post('/admin/books/delete/:id', async (req, res) => {
     }
 });
 
-// Admin อนุมัติคำสั่งซื้อ + ส่งอีเมลใบเสร็จ/ลิงก์ E-Book หาผู้ซื้อ
+// Admin อนุมัติคำสั่งซื้อ
 app.post(['/admin/approve-order/:id', '/admin/orders/approve/:id'], async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
     const orderId = req.params.id;
 
     try {
+        // 1. อนุมัติสถานะออเดอร์ในฐานข้อมูลก่อน
         await db.query('UPDATE orders SET status = "approved" WHERE id = ?', [orderId]);
 
-        const [orderRows] = await db.query(
-            'SELECT o.id, o.total_price, o.created_at, u.email, u.name FROM orders o JOIN users u ON o.user_id = u.id WHERE o.id = ?',
-            [orderId]
-        );
+        // 2. พยายามส่งอีเมล (แยก try...catch ไว้ เพื่อไม่ให้ปุ่มอนุมัติพังหากส่งอีเมลมีปัญหา)
+        try {
+            const [orderRows] = await db.query(
+                'SELECT o.id, o.total_price, o.created_at, u.email, u.name FROM orders o JOIN users u ON o.user_id = u.id WHERE o.id = ?',
+                [orderId]
+            );
 
-        const order = orderRows[0];
-        const [items] = await db.query(
-            'SELECT b.title, b.price, b.ebook_url FROM order_items oi JOIN books b ON oi.book_id = b.id WHERE oi.order_id = ?',
-            [orderId]
-        );
+            if (orderRows.length > 0) {
+                const order = orderRows[0];
+                const [items] = await db.query(
+                    'SELECT b.title, b.price, b.ebook_url FROM order_items oi JOIN books b ON oi.book_id = b.id WHERE oi.order_id = ?',
+                    [orderId]
+                );
 
-        let itemsHtml = items.map(function(item) {
-            return '<tr style="border-bottom: 1px solid #e2e8f0;">' +
-                '<td style="padding: 10px; font-weight: bold;">' + item.title + '</td>' +
-                '<td style="padding: 10px; text-align: center;">฿' + item.price + '</td>' +
-                '<td style="padding: 10px; text-align: right;">' +
-                '<a href="' + item.ebook_url + '" target="_blank" style="background: #2563eb; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-weight: bold;"> อ่าน / ดาวน์โหลด</a>' +
-                '</td>' +
-                '</tr>';
-        }).join('');
+                let itemsHtml = items.map(function(item) {
+                    return '<tr style="border-bottom: 1px solid #e2e8f0;">' +
+                        '<td style="padding: 10px; font-weight: bold;">' + (item.title || 'E-Book') + '</td>' +
+                        '<td style="padding: 10px; text-align: center;">฿' + item.price + '</td>' +
+                        '<td style="padding: 10px; text-align: right;">' +
+                        '<a href="' + (item.ebook_url || '#') + '" target="_blank" style="background: #2563eb; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-weight: bold;"> อ่าน / ดาวน์โหลด</a>' +
+                        '</td>' +
+                        '</tr>';
+                }).join('');
 
-        const dateStr = new Date(order.created_at).toLocaleString('th-TH');
+                const dateStr = order.created_at ? new Date(order.created_at).toLocaleString('th-TH') : '-';
 
-        let emailContent = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">' +
-            '<h2 style="color: #2563eb; text-align: center;"> ใบเสร็จรับเงิน & สลิปการสั่งซื้อ</h2>' +
-            '<p>สวัสดีคุณ <strong>' + order.name + '</strong>,</p>' +
-            '<p>คำสั่งซื้อของคุณได้รับการอนุมัติเรียบร้อยแล้ว รายละเอียดสลิปและลิงก์อ่านหนังสืออยู่ด้านล่างนี้ครับ:</p>' +
-            '<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">' +
-            '<p style="margin: 4px 0;"><strong>หมายเลขออเดอร์:</strong> #' + order.id + '</p>' +
-            '<p style="margin: 4px 0;"><strong>วันที่สั่งซื้อ:</strong> ' + dateStr + '</p>' +
-            '<p style="margin: 4px 0;"><strong>สถานะ:</strong> <span style="color: #166534; font-weight: bold;">ชำระเงินแล้ว (อนุมัติแล้ว)</span></p>' +
-            '</div>' +
-            '<table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">' +
-            '<thead>' +
-            '<tr style="background: #2563eb; color: white;">' +
-            '<th style="padding: 10px; text-align: left;">รายการหนังสือ</th>' +
-            '<th style="padding: 10px; text-align: center;">ราคา</th>' +
-            '<th style="padding: 10px; text-align: right;">ดาวน์โหลด</th>' +
-            '</tr>' +
-            '</thead>' +
-            '<tbody>' + itemsHtml + '</tbody>' +
-            '</table>' +
-            '<div style="text-align: right; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; color: #0f172a;">' +
-            'ยอดชำระสุทธิ: <span style="color: #2563eb;">฿' + order.total_price + '</span>' +
-            '</div>' +
-            '<hr style="border: 0; border-top: 1px solid #e2e8f0;">' +
-            '<p style="color: #64748b; font-size: 0.85rem; text-align: center; margin-top: 15px;">ขอบคุณที่อุดหนุนหนังสือจาก NEXTREAD ครับ</p>' +
-            '</div>';
+                let emailContent = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px;">' +
+                    '<h2 style="color: #2563eb; text-align: center;"> ใบเสร็จรับเงิน & สลิปการสั่งซื้อ</h2>' +
+                    '<p>สวัสดีคุณ <strong>' + (order.name || 'ลูกค้า') + '</strong>,</p>' +
+                    '<p>คำสั่งซื้อของคุณได้รับการอนุมัติเรียบร้อยแล้ว รายละเอียดสลิปและลิงก์อ่านหนังสืออยู่ด้านล่างนี้ครับ:</p>' +
+                    '<div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px;">' +
+                    '<p style="margin: 4px 0;"><strong>หมายเลขออเดอร์:</strong> #' + order.id + '</p>' +
+                    '<p style="margin: 4px 0;"><strong>วันที่สั่งซื้อ:</strong> ' + dateStr + '</p>' +
+                    '<p style="margin: 4px 0;"><strong>สถานะ:</strong> <span style="color: #166534; font-weight: bold;">ชำระเงินแล้ว (อนุมัติแล้ว)</span></p>' +
+                    '</div>' +
+                    '<table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">' +
+                    '<thead>' +
+                    '<tr style="background: #2563eb; color: white;">' +
+                    '<th style="padding: 10px; text-align: left;">รายการหนังสือ</th>' +
+                    '<th style="padding: 10px; text-align: center;">ราคา</th>' +
+                    '<th style="padding: 10px; text-align: right;">ดาวน์โหลด</th>' +
+                    '</tr>' +
+                    '</thead>' +
+                    '<tbody>' + itemsHtml + '</tbody>' +
+                    '</table>' +
+                    '<div style="text-align: right; font-size: 1.2rem; font-weight: bold; margin-bottom: 20px; color: #0f172a;">' +
+                    'ยอดชำระสุทธิ: <span style="color: #2563eb;">฿' + order.total_price + '</span>' +
+                    '</div>' +
+                    '<hr style="border: 0; border-top: 1px solid #e2e8f0;">' +
+                    '<p style="color: #64748b; font-size: 0.85rem; text-align: center; margin-top: 15px;">ขอบคุณที่อุดหนุนหนังสือจาก NEXTREAD ครับ</p>' +
+                    '</div>';
 
-        let mailOptions = {
-            from: '"NEXTREAD E-Book Store" <flukesingkham@gmail.com>',
-            to: order.email,
-            subject: '[ใบเสร็จ & ลิงก์อ่านหนังสือ] คำสั่งซื้อ #' + order.id + ' ได้รับการอนุมัติแล้ว',
-            html: emailContent
-        };
+                let mailOptions = {
+                    from: '"NEXTREAD E-Book Store" <' + (process.env.EMAIL_USER || 'flukesingkham@gmail.com') + '>',
+                    to: order.email,
+                    subject: '[ใบเสร็จ & ลิงก์อ่านหนังสือ] คำสั่งซื้อ #' + order.id + ' ได้รับการอนุมัติแล้ว',
+                    html: emailContent
+                };
 
-        await transporter.sendMail(mailOptions);
+                await transporter.sendMail(mailOptions);
+            }
+        } catch (emailErr) {
+            console.error('Email send failed but order approved successfully:', emailErr);
+        }
+
         res.redirect('/admin');
     } catch (err) {
         console.error(err);
