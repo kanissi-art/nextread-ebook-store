@@ -75,39 +75,60 @@
         <div class="card">
             <form action="/admin/edit/<%= book.id %>" method="POST" enctype="multipart/form-data">
                 <div class="form-group">
-                    <label>ชื่อหนังสือ</label>
-                    <input type="text" name="title" value="<%= book.title %>" required>
+                    <label for="title">ชื่อหนังสือ</label>
+                    <input id="title" type="text" name="title" value="<%= book.title %>" required>
                 </div>
+
                 <div class="form-group">
-                    <label>ชื่อผู้แต่ง</label>
-                    <input type="text" name="author" value="<%= book.author %>" required>
+                    <label for="author">ชื่อผู้แต่ง</label>
+                    <input id="author" type="text" name="author" value="<%= book.author %>" required>
                 </div>
+
                 <div class="form-group">
-                    <label>ราคา (บาท)</label>
-                    <input type="number" step="0.01" name="price" value="<%= book.price %>" required>
+                    <label for="price">ราคา (บาท)</label>
+                    <input id="price" type="number" step="0.01" name="price" value="<%= book.price %>" required>
                 </div>
+
                 <div class="form-group">
-                    <label>หมวดหมู่</label>
-                    <select name="category" required>
-                        <option value="การออกแบบ" <%= book.category === 'การออกแบบ' ? 'selected' : '' %>>การออกแบบ</option>
-                        <option value="เทคโนโลยี" <%= book.category === 'เทคโนโลยี' ? 'selected' : '' %>>เทคโนโลยี</option>
-                        <option value="ไลฟ์สไตล์" <%= book.category === 'ไลฟ์สไตล์' ? 'selected' : '' %>>ไลฟ์สไตล์</option>
-                        <option value="วิทยาการข้อมูล" <%= book.category === 'วิทยาการข้อมูล' ? 'selected' : '' %>>วิทยาการข้อมูล</option>
-                        <option value="จิตวิทยา" <%= book.category === 'จิตวิทยา' ? 'selected' : '' %>>จิตวิทยา</option>
+                    <label for="category_id">หมวดหมู่</label>
+                    <select id="category_id" name="category_id">
+                        <option value="">ไม่ระบุหมวดหมู่</option>
+                        <% categories.forEach(category => { %>
+                            <option value="<%= category.id %>"
+                                <%= book.category_id == category.id ? 'selected' : '' %>>
+                                <%= category.name %>
+                            </option>
+                        <% }) %>
                     </select>
                 </div>
+
                 <div class="form-group">
-                    <label>🖼️ อัปโหลดรูปภาพปกใหม่ (จากในเครื่อง)</label>
-                    <input type="file" name="cover_image_file" accept="image/*">
+                    <label for="cover_image">อัปโหลดรูปปกใหม่</label>
+                    <input id="cover_image" type="file" name="cover_image" accept="image/*">
                 </div>
+
                 <div class="form-group">
-                    <label>🔗 URL รูปภาพเดิม/สำรอง</label>
-                    <input type="text" name="cover_image_url" value="<%= book.cover_image %>">
+                    <label for="current_cover">URL รูปปก</label>
+                    <input id="current_cover" type="text" name="current_cover"
+                           value="<%= book.cover_image || '' %>">
                 </div>
+
                 <div class="form-group">
-                    <label>เรื่องย่อ / รายละเอียดหนังสือ</label>
-                    <textarea name="description" rows="4"><%= book.description %></textarea>
+                    <label for="ebook_file">อัปโหลดไฟล์ E-Book ใหม่</label>
+                    <input id="ebook_file" type="file" name="ebook_file">
                 </div>
+
+                <div class="form-group">
+                    <label for="current_ebook">URL หรือพาธไฟล์ E-Book</label>
+                    <input id="current_ebook" type="text" name="current_ebook"
+                           value="<%= book.ebook_url || '' %>">
+                </div>
+
+                <div class="form-group">
+                    <label for="description">เรื่องย่อ / รายละเอียดหนังสือ</label>
+                    <textarea id="description" name="description" rows="4"><%= book.description || '' %></textarea>
+                </div>
+
                 <button type="submit" class="btn-submit">อัปเดตข้อมูล</button>
                 <a href="/admin" class="btn-cancel">ยกเลิก</a>
             </form>

@@ -154,6 +154,19 @@
                     <input type="text" name="cover_url" placeholder="https://..." style="width: 100%;">
                 </div>
 
+                <div class="form-row">
+                    <label>ไฟล์ E-Book</label>
+                    <input type="file" name="ebook_file" style="width:100%;">
+                </div>
+                <div class="form-row">
+                    <label>หรือ URL ไฟล์ E-Book</label>
+                    <input type="text" name="ebook_url" placeholder="https://..." style="width:100%;">
+                </div>
+                <div class="form-full">
+                    <label>รายละเอียด</label>
+                    <textarea name="description" rows="3" style="width:100%;"></textarea>
+                </div>
+
                 <div class="form-full">
                     <button type="submit" class="btn-add">เพิ่มหนังสือลงคลัง</button>
                 </div>
@@ -175,8 +188,12 @@
                             <td><%= book.category_name || '-' %></td>
                             <td>฿<%= book.price %></td>
                             <td>
-                                <a href="/admin/books/edit/<%= book.id %>">แก้ไข</a> | 
-                                <a href="/admin/books/delete/<%= book.id %>" onclick="return confirm('ยืนยันลบ?')" style="color:red;">ลบ</a>
+                                <a href="/admin/books/edit/<%= book.id %>">แก้ไข</a>
+                                <form action="/admin/books/delete/<%= book.id %>" method="POST"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('ยืนยันลบหนังสือเล่มนี้?')">
+                                    <button type="submit" style="color:red;">ลบ</button>
+                                </form>
                             </td>
                         </tr>
                     <% }) %>

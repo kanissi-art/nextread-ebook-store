@@ -1,4 +1,3 @@
-
 const express = require('express');
 const session = require('express-session');
 const mysql = require('mysql2/promise');
@@ -407,7 +406,7 @@ app.get('/admin/export/orders', async (req, res) => {
         let csv = 'Order ID,Customer Email,Total Price,Status,Date\n';
         orders.forEach(row => {
             const date = row.created_at ? new Date(row.created_at).toLocaleString('th-TH') : '';
-            csv += `row.id,{row.user_email},row.totalprice,{row.status},${date}\n`;
+            csv += `${row.id},${row.user_email},${row.total_price},${row.status},"${date}"\n`;
         });
         
         // ใส่ \uFEFF ให้ Excel อ่านภาษาไทยได้ไม่เพี้ยน
@@ -417,21 +416,29 @@ app.get('/admin/export/orders', async (req, res) => {
     } catch (err) { console.error(err); res.status(500).send('Error Exporting'); }
 });
 
-// Admin หน้าแก้ไขหนังสือ (เพิ่มการรองรับ URL ทั้ง 2 รูปแบบ)
+// Admin หน้าแก้ไขหนังสือ
 app.get(['/admin/books/edit/:id', '/admin/edit/:id'], async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
 
     try {
-        const [books] = await db.query('SELECT * FROM books WHERE id = ?', [req.params.id]);
-        if (books.length === 0) return res.status(404).send('ไม่พบหนังสือ');
-        res.render('admin-edit', { book: books[0] });
+        const [[book]] = await db.query(
+            'SELECT * FROM books WHERE id = ?',
+            [req.params.id]
+        );
+        if (!book) return res.status(404).send('ไม่พบหนังสือ');
+
+        const [categories] = await db.query(
+            'SELECT * FROM categories ORDER BY name ASC'
+        );
+
+        res.render('admin-edit', { book, categories });
     } catch (err) {
         console.error(err);
         res.status(500).send('Database Error');
     }
 });
 
-// Admin บันทึกการแก้ไขหนังสือ (เพิ่มการรองรับ URL ทั้ง 2 รูปแบบ)
+// Admin บันทึกการแก้ไขหนังสือ
 app.post(['/admin/books/edit/:id', '/admin/edit/:id'], upload.fields([
     { name: 'cover_image', maxCount: 1 },
     { name: 'ebook_file', maxCount: 1 }
@@ -439,14 +446,34 @@ app.post(['/admin/books/edit/:id', '/admin/edit/:id'], upload.fields([
     if (!req.session.isAdmin) return res.redirect('/');
 
     const { title, author, price, description, current_cover, current_ebook } = req.body;
-    const coverImage = req.files['cover_image'] ? '/uploads/' + req.files['cover_image'][0].filename : current_cover;
-    const ebookUrl = req.files['ebook_file'] ? '/uploads/' + req.files['ebook_file'][0].filename : current_ebook;
+    const categoryId = req.body.category_id || null;
+    const coverImage = req.files?.cover_image?.[0]
+        ? '/uploads/' + req.files.cover_image[0].filename
+        : (current_cover || '');
+    const ebookUrl = req.files?.ebook_file?.[0]
+        ? '/uploads/' + req.files.ebook_file[0].filename
+        : (current_ebook || '');
 
     try {
+        if (categoryId) {
+            const [[category]] = await db.query(
+                'SELECT id FROM categories WHERE id = ?',
+                [categoryId]
+            );
+            if (!category) return res.status(400).send('ไม่พบหมวดหมู่ที่เลือก');
+        }
+
         await db.query(
-            'UPDATE books SET title = ?, author = ?, price = ?, description = ?, cover_image = ?, ebook_url = ? WHERE id = ?',
-            [title, author, price, description, coverImage, ebookUrl, req.params.id]
+            `UPDATE books
+             SET title = ?, author = ?, price = ?, description = ?,
+                 cover_image = ?, ebook_url = ?, category_id = ?
+             WHERE id = ?`,
+            [
+                title, author, price, description, coverImage, ebookUrl,
+                categoryId, req.params.id
+            ]
         );
+
         res.redirect('/admin');
     } catch (err) {
         console.error(err);
@@ -568,6 +595,33 @@ app.post(['/admin/approve-order/:id', '/admin/orders/approve/:id'], async (req, 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log('Server running at http://localhost:' + PORT);
+});
+
+app.post('/admin/categories/:id/edit', async (req, res) => {
+    if (!req.session.isAdmin) return res.redirect('/');
+
+    const name = (req.body.name || '').trim();
+    if (!name) return res.redirect('/admin');
+
+    try {
+        await db.query('UPDATE categories SET name = ? WHERE id = ?', [name, req.params.id]);
+        res.redirect('/admin');
+    } catch (err) {
+        console.error(err);
+        res.status(400).send('แก้ไขหมวดหมู่ไม่สำเร็จ');
+    }
+});
+
+app.post('/admin/categories/:id/delete', async (req, res) => {
+    if (!req.session.isAdmin) return res.redirect('/');
+
+    try {
+        await db.query('DELETE FROM categories WHERE id = ?', [req.params.id]);
+        res.redirect('/admin');
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('ลบหมวดหมู่ไม่สำเร็จ');
+    }
 });
 
 
