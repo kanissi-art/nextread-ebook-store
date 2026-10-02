@@ -251,12 +251,12 @@
                 
                 <select name="category" style="padding: 10px 15px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; min-width: 150px; outline: none;">
                     <option value="">📁 ทุกหมวดหมู่</option>
-                    <% if (typeof categories !== 'undefined') { %>
-                        <% categories.forEach(cat => { %>
+                    <% if (typeof categories !== 'undefined' && categories.length > 0) { %>
+                        <% categories.forEach(function(cat) { %>
                             <option value="<%= cat.id %>" <%= (typeof categoryFilter !== 'undefined' && categoryFilter == cat.id) ? 'selected' : '' %>>
                                 <%= cat.name %>
                             </option>
-                        <% }) %>
+                        <% }); %>
                     <% } %>
                 </select>
 
@@ -305,7 +305,7 @@
             document.body.classList.add('dark-mode');
         }
 
-        // โค้ดสำหรับค้นหาหนังสือแบบ Real-time
+        // โค้ดสำหรับค้นหาหนังสือแบบ Real-time บนหน้าเว็บ
         document.addEventListener('DOMContentLoaded', function() {
             const searchInput = document.querySelector('input[name="search"]');
             const bookCards = document.querySelectorAll('.book-card');
@@ -330,3 +330,6 @@
     </script>
 </body>
 </html>
+
+
+
