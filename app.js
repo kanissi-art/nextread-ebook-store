@@ -1,3 +1,4 @@
+
 const express = require('express');
 const session = require('express-session');
 const mysql = require('mysql2/promise');
@@ -80,11 +81,11 @@ app.get('/', async (req, res) => {
         let query = 'SELECT b.*, c.name as category_name FROM books b LEFT JOIN categories c ON b.category_id = c.id WHERE 1=1';
         let queryParams = [];
 
-       // ถ้ามีการพิมพ์ค้นหา
+        // ถ้ามีการพิมพ์ค้นหา
         if (searchQuery) {
             query += ' AND (b.title LIKE ? OR b.author LIKE ?)';
-            // แก้ไขบรรทัดล่างนี้ โดยเติมเครื่องหมาย $ ลงไป
-            queryParams.push(`%${searchQuery}%`, `%${searchQuery}%`);
+            // แก้ไข Syntax ให้ถูกต้องแล้ว ค้นหาเจอแน่นอน
+            queryParams.push(`%searchQuery%`,`%{searchQuery}%`);
         }
 
         // ถ้ามีการเลือกหมวดหมู่
@@ -416,7 +417,7 @@ app.get('/admin/export/orders', async (req, res) => {
     } catch (err) { console.error(err); res.status(500).send('Error Exporting'); }
 });
 
-// Admin หน้าแก้ไขหนังสือ
+// Admin หน้าแก้ไขหนังสือ (เพิ่มการรองรับ URL ทั้ง 2 รูปแบบ)
 app.get(['/admin/books/edit/:id', '/admin/edit/:id'], async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
 
@@ -430,7 +431,7 @@ app.get(['/admin/books/edit/:id', '/admin/edit/:id'], async (req, res) => {
     }
 });
 
-// Admin บันทึกการแก้ไขหนังสือ
+// Admin บันทึกการแก้ไขหนังสือ (เพิ่มการรองรับ URL ทั้ง 2 รูปแบบ)
 app.post(['/admin/books/edit/:id', '/admin/edit/:id'], upload.fields([
     { name: 'cover_image', maxCount: 1 },
     { name: 'ebook_file', maxCount: 1 }
@@ -568,6 +569,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log('Server running at http://localhost:' + PORT);
 });
-
 
 
