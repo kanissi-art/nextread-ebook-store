@@ -217,12 +217,10 @@
             <a href="/cart">🛒 ตะกร้าสินค้า <% if (cart && cart.length > 0) { %><span class="cart-badge"><%= cart.reduce((sum, i) => sum + i.quantity, 0) %></span><% } %></a>
             
             <% if (user) { %>
-                <!-- ปุ่มชั้นหนังสือของฉันที่เพิ่มเข้ามา -->
                 <a href="/my-books" style="color: #f59e0b; font-weight: bold;">📚 ชั้นหนังสือของฉัน</a>
                 <a href="/my-orders">📦 คำสั่งซื้อของฉัน</a>
                 <span>👤 สวัสดี, <%= user.name %></span>
                 
-                <!-- แสดงเฉพาะเมื่อเป็น Admin เท่านั้น -->
                 <% if (isAdmin) { %>
                     <a href="/admin" class="btn-admin">⚙️ แอดมิน</a>
                 <% } %>
@@ -242,16 +240,15 @@
             <h1>คลังหนังสือ E-Book คุณภาพ</h1>
             <p>เลือกอ่านหนังสือที่คุณชื่นชอบได้ทุกที่ ทุกเวลา</p>
         </div>
+        
         <!-- ระบบค้นหาและกรองหมวดหมู่ -->
         <div style="max-width: 800px; margin: 0 auto 2rem auto; padding: 0 1rem;">
             <form action="/" method="GET" style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
                 
-                <!-- กล่องค้นหาจากชื่อเรื่อง / ผู้แต่ง -->
                 <input type="text" name="search" placeholder="🔍 ค้นหาชื่อหนังสือ, ผู้แต่ง..." 
                        value="<%= typeof searchQuery !== 'undefined' ? searchQuery : '' %>"
                        style="padding: 10px 15px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; flex: 1; min-width: 200px; outline: none;">
                 
-                <!-- ดรอปดาวน์เลือกหมวดหมู่ -->
                 <select name="category" style="padding: 10px 15px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; min-width: 150px; outline: none;">
                     <option value="">📁 ทุกหมวดหมู่</option>
                     <% if (typeof categories !== 'undefined') { %>
@@ -263,7 +260,6 @@
                     <% } %>
                 </select>
 
-                <!-- ปุ่มค้นหาและล้างค่า -->
                 <button type="submit" style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
                     ค้นหา
                 </button>
@@ -272,9 +268,6 @@
                 </a>
             </form>
         </div>
-        <!-- จบระบบค้นหา -->
-
-
 
         <div class="book-grid">
             <% if (books && books.length > 0) { %>
@@ -301,6 +294,7 @@
     </div>
 
     <script>
+        // โค้ดสำหรับเปลี่ยน Theme
         function toggleTheme() {
             document.body.classList.toggle('dark-mode');
             const isDark = document.body.classList.contains('dark-mode');
@@ -310,6 +304,29 @@
         if (localStorage.getItem('theme') === 'dark') {
             document.body.classList.add('dark-mode');
         }
+
+        // โค้ดสำหรับค้นหาหนังสือแบบ Real-time
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.querySelector('input[name="search"]');
+            const bookCards = document.querySelectorAll('.book-card');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', function(e) {
+                    const searchTerm = e.target.value.toLowerCase().trim();
+
+                    bookCards.forEach(card => {
+                        const title = card.querySelector('.book-title') ? card.querySelector('.book-title').innerText.toLowerCase() : '';
+                        const author = card.querySelector('.book-author') ? card.querySelector('.book-author').innerText.toLowerCase() : '';
+
+                        if (title.includes(searchTerm) || author.includes(searchTerm)) {
+                            card.style.display = '';
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                });
+            }
+        });
     </script>
 </body>
 </html>

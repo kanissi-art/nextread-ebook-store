@@ -417,7 +417,7 @@ app.get('/admin/export/orders', async (req, res) => {
 });
 
 // Admin หน้าแก้ไขหนังสือ
-app.get('/admin/books/edit/:id', async (req, res) => {
+app.get(['/admin/books/edit/:id', '/admin/edit/:id'], async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
 
     try {
@@ -431,7 +431,7 @@ app.get('/admin/books/edit/:id', async (req, res) => {
 });
 
 // Admin บันทึกการแก้ไขหนังสือ
-app.post('/admin/books/edit/:id', upload.fields([
+app.post(['/admin/books/edit/:id', '/admin/edit/:id'], upload.fields([
     { name: 'cover_image', maxCount: 1 },
     { name: 'ebook_file', maxCount: 1 }
 ]), async (req, res) => {
