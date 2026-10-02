@@ -81,11 +81,11 @@ app.get('/', async (req, res) => {
         let query = 'SELECT b.*, c.name as category_name FROM books b LEFT JOIN categories c ON b.category_id = c.id WHERE 1=1';
         let queryParams = [];
 
-        // ถ้ามีการพิมพ์ค้นหา
+        // ถ้ามีการพิมพ์ค้นหา (จุดเดียวที่ปรับแก้ให้ปลอดภัย 100%)
         if (searchQuery) {
             query += ' AND (b.title LIKE ? OR b.author LIKE ?)';
-            // แก้ไข Syntax ให้ถูกต้องแล้ว ค้นหาเจอแน่นอน
-            queryParams.push(`%searchQuery%`,`%{searchQuery}%`);
+            // ใช้วิธีต่อ String ธรรมดาเพื่อป้องกันเครื่องหมายเพี้ยน
+            queryParams.push('%' + searchQuery + '%', '%' + searchQuery + '%');
         }
 
         // ถ้ามีการเลือกหมวดหมู่
