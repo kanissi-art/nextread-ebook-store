@@ -80,11 +80,11 @@ app.get('/', async (req, res) => {
         let query = 'SELECT b.*, c.name as category_name FROM books b LEFT JOIN categories c ON b.category_id = c.id WHERE 1=1';
         let queryParams = [];
 
-        // ถ้ามีการพิมพ์ค้นหา
+       // ถ้ามีการพิมพ์ค้นหา
         if (searchQuery) {
             query += ' AND (b.title LIKE ? OR b.author LIKE ?)';
-            // แก้ไขบรรทัดล่างนี้ให้ถูกต้องแล้ว
-            queryParams.push(`%searchQuery%`,`%{searchQuery}%`);
+            // แก้ไขบรรทัดล่างนี้ โดยเติมเครื่องหมาย $ ลงไป
+            queryParams.push(`%${searchQuery}%`, `%${searchQuery}%`);
         }
 
         // ถ้ามีการเลือกหมวดหมู่
