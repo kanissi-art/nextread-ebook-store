@@ -70,35 +70,48 @@ app.use((req, res, next) => {
 // หน้าหลัก แสดงรายการหนังสือ + ระบบค้นหาและจัดหมวดหมู่
 app.get('/', async (req, res) => {
     try {
-        let searchQuery = req.query.search || '';
-        let categoryFilter = req.query.category || '';
-        
-        // ดึงหมวดหมู่ทั้งหมดไปแสดงใน Dropdown
-        const [categories] = await db.query('SELECT * FROM categories ORDER BY name ASC');
-        
-        // สร้างคำสั่ง SQL สำหรับการค้นหา
-        let query = 'SELECT b.*, c.name as category_name FROM books b LEFT JOIN categories c ON b.category_id = c.id WHERE 1=1';
-        let queryParams = [];
+        const searchQuery =
+            typeof req.query.search === 'string' ? req.query.search.trim() : '';
+        const requestedCategory =
+            typeof req.query.category === 'string' ? req.query.category : '';
+        const categoryFilter = /^\d+$/.test(requestedCategory)
+            ? requestedCategory
+            : '';
 
-        // ถ้ามีการพิมพ์ค้นหา (จุดเดียวที่ปรับแก้ให้ปลอดภัย 100%)
+        const [categories] = await db.query(
+            'SELECT * FROM categories ORDER BY name ASC'
+        );
+
+        let query = `
+            SELECT b.*, c.name AS category_name
+            FROM books b
+            LEFT JOIN categories c ON c.id = b.category_id
+            WHERE 1 = 1
+        `;
+        const params = [];
+
         if (searchQuery) {
-            query += ' AND (b.title LIKE ? OR b.author LIKE ?)';
-            // ใช้วิธีต่อ String ธรรมดาเพื่อป้องกันเครื่องหมายเพี้ยน
-            queryParams.push('%' + searchQuery + '%', '%' + searchQuery + '%');
+            query += ` AND (
+                b.title LIKE ? OR b.author LIKE ? OR c.name LIKE ?
+            )`;
+            const term = `%${searchQuery}%`;
+            params.push(term, term, term);
         }
 
-        // ถ้ามีการเลือกหมวดหมู่
         if (categoryFilter) {
             query += ' AND b.category_id = ?';
-            queryParams.push(categoryFilter);
+            params.push(categoryFilter);
         }
 
         query += ' ORDER BY b.id DESC';
 
-        const [books] = await db.query(query, queryParams);
-        
-        // ส่งตัวแปรทั้งหมดไปที่หน้า index.ejs
-        res.render('index', { books, categories, searchQuery, categoryFilter });
+        const [books] = await db.query(query, params);
+        res.render('index', {
+            books,
+            categories,
+            searchQuery,
+            categoryFilter
+        });
     } catch (err) {
         console.error(err);
         res.status(500).send('Database Error');
@@ -266,7 +279,11 @@ app.get('/my-orders', async (req, res) => {
         const [orders] = await db.query('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC', [req.session.user.id]);
         for (let order of orders) {
             const [items] = await db.query(
-                'SELECT oi.*, b.title as book_title, b.ebook_url FROM order_items oi JOIN books b ON oi.book_id = b.id WHERE oi.order_id = ?',
+                `SELECT oi.*, COALESCE(b.title, oi.book_title) AS book_title,
+                    COALESCE(b.ebook_url, oi.ebook_url) AS ebook_url
+                 FROM order_items oi
+                 LEFT JOIN books b ON oi.book_id = b.id
+                 WHERE oi.order_id = ?`,
                 [order.id]
             );
             order.items = items;
@@ -382,38 +399,81 @@ app.post('/admin/books/add', upload.fields([
 // --- ฟังก์ชันใหม่: จัดการหมวดหมู่ ---
 app.post('/admin/categories/add', async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
+
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    if (!name) return res.redirect('/admin');
+
     try {
-        await db.query('INSERT INTO categories (name) VALUES (?)', [req.body.name]);
+        await db.query('INSERT INTO categories (name) VALUES (?)', [name]);
         res.redirect('/admin');
-    } catch (err) { console.error(err); res.status(500).send('Error'); }
+    } catch (err) {
+        console.error(err);
+        res.status(400).send('เพิ่มหมวดหมู่ไม่สำเร็จ หรือชื่อหมวดหมู่ซ้ำ');
+    }
 });
 
 // --- ฟังก์ชันใหม่: อัปเดตสิทธิ์ผู้ใช้ (Admin/User) ---
 app.post('/admin/users/role/:id', async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
+
+    const { role } = req.body;
+    if (!['user', 'admin'].includes(role)) {
+        return res.status(400).send('บทบาทไม่ถูกต้อง');
+    }
+
     try {
-        await db.query('UPDATE users SET role = ? WHERE id = ?', [req.body.role, req.params.id]);
+        await db.query(
+            'UPDATE users SET role = ? WHERE id = ?',
+            [role, req.params.id]
+        );
         res.redirect('/admin');
-    } catch (err) { console.error(err); res.status(500).send('Error'); }
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('เปลี่ยนบทบาทไม่สำเร็จ');
+    }
 });
 
 // --- ฟังก์ชันใหม่: ระบบ Export เป็น CSV ---
 app.get('/admin/export/orders', async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
+
     try {
-        const [orders] = await db.query("SELECT id, user_email, total_price, status, created_at FROM orders ORDER BY id DESC");
-        
-        let csv = 'Order ID,Customer Email,Total Price,Status,Date\n';
-        orders.forEach(row => {
-            const date = row.created_at ? new Date(row.created_at).toLocaleString('th-TH') : '';
-            csv += `${row.id},${row.user_email},${row.total_price},${row.status},"${date}"\n`;
-        });
-        
-        // ใส่ \uFEFF ให้ Excel อ่านภาษาไทยได้ไม่เพี้ยน
-        res.header('Content-Type', 'text/csv; charset=utf-8');
+        const [orders] = await db.query(`
+            SELECT id, user_email, total_price, status, created_at
+            FROM orders
+            ORDER BY id DESC
+        `);
+
+        const csvCell = value => {
+            let text = String(value ?? '');
+            if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+            return `"${text.replace(/"/g, '""')}"`;
+        };
+
+        const rows = [
+            ['Order ID', 'Customer Email', 'Total Price', 'Status', 'Date'],
+            ...orders.map(order => [
+                order.id,
+                order.user_email,
+                order.total_price,
+                order.status,
+                order.created_at
+                    ? new Date(order.created_at).toLocaleString('th-TH')
+                    : ''
+            ])
+        ];
+
+        const csv = rows
+            .map(row => row.map(csvCell).join(','))
+            .join('\r\n');
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.attachment('sales_report.csv');
         res.send('\uFEFF' + csv);
-    } catch (err) { console.error(err); res.status(500).send('Error Exporting'); }
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error Exporting');
+    }
 });
 
 // Admin หน้าแก้ไขหนังสือ
@@ -527,13 +587,17 @@ app.post(['/admin/approve-order/:id', '/admin/orders/approve/:id'], async (req, 
                 if (orderRows.length > 0) {
                     const order = orderRows[0];
                     const [items] = await db.query(
-                        'SELECT b.title, b.price, b.ebook_url FROM order_items oi JOIN books b ON oi.book_id = b.id WHERE oi.order_id = ?',
-                        [orderId]
+                        `SELECT oi.*, COALESCE(b.title, oi.book_title) AS book_title,
+                            COALESCE(b.ebook_url, oi.ebook_url) AS ebook_url
+                         FROM order_items oi
+                         LEFT JOIN books b ON oi.book_id = b.id
+                         WHERE oi.order_id = ?`,
+                        [order.id]
                     );
 
                     let itemsHtml = items.map(function(item) {
                         return '<tr style="border-bottom: 1px solid #e2e8f0;">' +
-                            '<td style="padding: 10px; font-weight: bold;">' + (item.title || 'E-Book') + '</td>' +
+                            '<td style="padding: 10px; font-weight: bold;">' + (item.book_title || 'E-Book') + '</td>' +
                             '<td style="padding: 10px; text-align: center;">฿' + item.price + '</td>' +
                             '<td style="padding: 10px; text-align: right;">' +
                             '<a href="' + (item.ebook_url || '#') + '" target="_blank" style="background: #2563eb; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-weight: bold;"> อ่าน / ดาวน์โหลด</a>' +
@@ -600,11 +664,12 @@ app.listen(PORT, () => {
 app.post('/admin/categories/:id/edit', async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
 
-    const name = (req.body.name || '').trim();
-    if (!name) return res.redirect('/admin');
+    const id = req.params.id;
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    if (!/^\d+$/.test(id) || !name) return res.redirect('/admin');
 
     try {
-        await db.query('UPDATE categories SET name = ? WHERE id = ?', [name, req.params.id]);
+        await db.query('UPDATE categories SET name = ? WHERE id = ?', [name, id]);
         res.redirect('/admin');
     } catch (err) {
         console.error(err);
@@ -614,6 +679,7 @@ app.post('/admin/categories/:id/edit', async (req, res) => {
 
 app.post('/admin/categories/:id/delete', async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
+    if (!/^\d+$/.test(req.params.id)) return res.redirect('/admin');
 
     try {
         await db.query('DELETE FROM categories WHERE id = ?', [req.params.id]);
