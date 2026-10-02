@@ -5,6 +5,7 @@ const nodemailer = require('nodemailer');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto'); // เพิ่มโมดูลสร้างรหัสสุ่มสำหรับ Download Link
 
 const app = express();
 
@@ -82,7 +83,8 @@ app.get('/', async (req, res) => {
         // ถ้ามีการพิมพ์ค้นหา
         if (searchQuery) {
             query += ' AND (b.title LIKE ? OR b.author LIKE ?)';
-            queryParams.push(`%\({searchQuery}%`, `%\){searchQuery}%`);
+            // แก้ไขบรรทัดล่างนี้ให้ถูกต้องแล้ว
+            queryParams.push(`%searchQuery%`,`%{searchQuery}%`);
         }
 
         // ถ้ามีการเลือกหมวดหมู่
@@ -229,6 +231,12 @@ app.post('/checkout', async (req, res) => {
             [req.session.user.id, req.session.user.email, totalPrice]
         );
         const orderId = result.insertId;
+
+        // --- เพิ่มเติม: บันทึกข้อมูลการชำระเงินจำลองลงตาราง payments ---
+        await db.query(
+            'INSERT INTO payments (order_id, payment_method, amount) VALUES (?, ?, ?)',
+            [orderId, 'mock_transfer', totalPrice]
+        );
 
         for (let item of cart) {
             const [books] = await db.query('SELECT title, ebook_url FROM books WHERE id = ?', [item.id]);
@@ -467,10 +475,20 @@ app.post(['/admin/approve-order/:id', '/admin/orders/approve/:id'], async (req, 
         // 1. อนุมัติสถานะออเดอร์ในฐานข้อมูลก่อน
         await db.query("UPDATE orders SET status = 'approved' WHERE id = ?", [orderId]);
 
+        // --- เพิ่มเติม: สร้าง Token ลิงก์ดาวน์โหลดบันทึกลงฐานข้อมูล ---
+        const [orderItems] = await db.query('SELECT id FROM order_items WHERE order_id = ?', [orderId]);
+        for (let item of orderItems) {
+            const token = crypto.randomBytes(16).toString('hex'); // สุ่มรหัส 32 ตัวอักษร
+            await db.query(
+                'INSERT IGNORE INTO download_links (order_item_id, token) VALUES (?, ?)',
+                [item.id, token]
+            );
+        }
+
         // 2. สั่ง Redirect กลับหน้า Admin ทันที! (ไม่รอให้อีเมลส่งเสร็จ)
         res.redirect('/admin');
 
-        // 3. เริ่มกระบวนการส่งอีเมลแบบ Background (ถ้าพังก็จะไม่กระทบหน้าเว็บ)
+        // 3. เริ่มกระบวนการส่งอีเมลแบบ Background
         (async () => {
             try {
                 const [orderRows] = await db.query(
@@ -550,5 +568,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log('Server running at http://localhost:' + PORT);
 });
+
 
 
