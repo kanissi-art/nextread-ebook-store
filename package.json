@@ -4,7 +4,10 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node app.js",
+    "seed:orders": "node scripts/ensure-demo-orders.js",
+    "check": "node --check app.js && node --check scripts/ensure-demo-orders.js && node -e \"const ejs=require('ejs'); const fs=require('fs'); for (const f of fs.readdirSync('views').filter(f=>f.endsWith('.ejs'))) ejs.compile(fs.readFileSync('views/'+f,'utf8'), {filename:'views/'+f}); console.log('Syntax checks passed')\"",
+    "test": "npm run check"
   },
   "keywords": [],
   "author": "",

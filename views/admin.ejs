@@ -63,6 +63,11 @@
                 📥 รายการคำสั่งซื้อ & รายงานวิเคราะห์
                 <a href="/admin/export/orders" class="btn-add" style="text-decoration: none;">📊 Export เป็น CSV</a>
             </h2>
+            <form action="/admin" method="GET" style="display:flex; gap:8px; margin:1rem 0;">
+                <input type="search" name="q" value="<%= searchQuery %>" placeholder="ค้นหาเลขออเดอร์ ชื่อ อีเมล หรือสถานะ" aria-label="ค้นหาคำสั่งซื้อ">
+                <button type="submit">ค้นหา</button>
+                <% if (searchQuery) { %><a href="/admin">ล้าง</a><% } %>
+            </form>
             <% if (orders && orders.length > 0) { %>
                 <table>
                     <thead>
@@ -70,6 +75,8 @@
                             <th>ออเดอร์ #</th>
                             <th>อีเมลลูกค้า</th>
                             <th>ยอดรวม</th>
+                            <th>การชำระเงิน</th>
+                            <th>รายการ</th>
                             <th>สถานะ</th>
                             <th>การกระทำ</th>
                         </tr>
@@ -80,17 +87,33 @@
                                 <td>#<%= order.id %></td>
                                 <td><%= order.user_email %></td>
                                 <td>฿<%= order.total_price %></td>
+                                <td><%= order.payment_method || 'ไม่มีข้อมูล' %> / ฿<%= order.payment_amount || 0 %></td>
+                                <td>
+                                    <details>
+                                        <summary>ดู <%= order.items.length %> รายการ</summary>
+                                        <ul>
+                                            <% order.items.forEach(item => { %>
+                                                <li><%= item.book_title %> x <%= item.quantity %> (฿<%= item.price %>/เล่ม)</li>
+                                            <% }) %>
+                                        </ul>
+                                    </details>
+                                </td>
                                 <td>
                                     <% if (order.status === 'pending') { %>
                                         <span class="badge-pending">⏳ รอตรวจสอบ</span>
+                                    <% } else if (order.status === 'approved') { %>
+                                        <span class="badge-approved">อนุมัติแล้ว</span>
                                     <% } else { %>
-                                        <span class="badge-approved">✅ อนุมัติแล้ว</span>
+                                        <span>ยกเลิกแล้ว</span>
                                     <% } %>
                                 </td>
                                 <td>
                                     <% if (order.status === 'pending') { %>
                                         <form action="/admin/approve-order/<%= order.id %>" method="POST" style="display:inline;">
                                             <button type="submit" class="btn-approve">✔ กดอนุมัติ & ส่งอีเมล</button>
+                                        </form>
+                                        <form action="/admin/orders/cancel/<%= order.id %>" method="POST" style="display:inline;">
+                                            <button type="submit">ยกเลิก</button>
                                         </form>
                                     <% } else { %>
                                         <span style="color: #64748b;">ดำเนินการแล้ว</span>
@@ -116,7 +139,15 @@
             <% if (categories && categories.length > 0) { %>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <% categories.forEach(cat => { %>
-                        <span style="background: #e2e8f0; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem;"><%= cat.name %></span>
+                        <span style="display:inline-flex; gap:6px; align-items:center; background:#e2e8f0; padding:5px 8px; font-size:.85rem;">
+                            <form action="/admin/categories/<%= cat.id %>/edit" method="POST" style="display:inline-flex; gap:4px;">
+                                <input type="text" name="name" value="<%= cat.name %>" required aria-label="ชื่อหมวดหมู่">
+                                <button type="submit">บันทึก</button>
+                            </form>
+                            <form action="/admin/categories/<%= cat.id %>/delete" method="POST" style="display:inline;" onsubmit="return confirm('ลบหมวดหมู่นี้?')">
+                                <button type="submit">ลบ</button>
+                            </form>
+                        </span>
                     <% }) %>
                 </div>
             <% } else { %>
@@ -185,6 +216,7 @@
                         <th>ชื่อหนังสือ</th>
                         <th>หมวดหมู่</th>
                         <th>ราคา</th>
+                        <th>สถานะ</th>
                         <th>จัดการ</th>
                     </tr>
                 </thead>
@@ -195,11 +227,19 @@
                             <td><%= book.category_name || '-' %></td>
                             <td>฿<%= book.price %></td>
                             <td>
+                                <form action="/admin/books/status/<%= book.id %>" method="POST">
+                                    <select name="is_active" onchange="this.form.submit()" aria-label="สถานะหนังสือ">
+                                        <option value="1" <%= book.is_active ? 'selected' : '' %>>พร้อมขาย</option>
+                                        <option value="0" <%= !book.is_active ? 'selected' : '' %>>ปิดขาย</option>
+                                    </select>
+                                </form>
+                            </td>
+                            <td>
                                 <a href="/admin/books/edit/<%= book.id %>">แก้ไข</a>
                                 <form action="/admin/books/delete/<%= book.id %>" method="POST"
                                       style="display:inline;"
-                                      onsubmit="return confirm('ยืนยันลบหนังสือเล่มนี้?')">
-                                    <button type="submit" style="color:red;">ลบ</button>
+                                                                            onsubmit="return confirm('ยืนยันปิดการขายหนังสือเล่มนี้?')">
+                                                                        <button type="submit" style="color:red;">ปิดการขาย</button>
                                 </form>
                             </td>
                         </tr>

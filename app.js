@@ -1,6 +1,7 @@
 const express = require('express');
 const session = require('express-session');
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const multer = require('multer');
 const path = require('path');
@@ -12,7 +13,9 @@ const app = express();
 // --- 1. ตั้งค่า Storage สำหรับ Upload รูปภาพและไฟล์ E-Book ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const uploadDir = 'public/uploads/';
+        const uploadDir = file.fieldname === 'ebook_file'
+            ? path.join(__dirname, 'private', 'ebooks')
+            : path.join(__dirname, 'public', 'uploads');
         if (!fs.existsSync(uploadDir)) {
             fs.mkdirSync(uploadDir, { recursive: true });
         }
@@ -25,6 +28,12 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // --- 2. ตั้งค่า Database Connection ---
+const databaseSsl = process.env.DB_SSL_CA
+    ? { ca: process.env.DB_SSL_CA }
+    : (process.env.NODE_ENV === 'production'
+        ? { rejectUnauthorized: true }
+        : { rejectUnauthorized: false });
+
 const db = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
@@ -33,17 +42,16 @@ const db = mysql.createPool({
   port: process.env.DB_PORT || 3306,
   waitForConnections: true,
   connectionLimit: 10,
-  ssl: { rejectUnauthorized: false }
+    ssl: databaseSsl
 });
 
 // --- 3. ตั้งค่า Nodemailer ---
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER || 'flukesingkham@gmail.com',
-        pass: process.env.EMAIL_PASS || 'giwckikvajxorjcz'
-    }
-});
+const transporter = process.env.EMAIL_USER && process.env.EMAIL_PASS
+    ? nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+    })
+    : null;
 
 // --- 4. Middleware ---
 app.use(express.urlencoded({ extended: true }));
@@ -51,10 +59,20 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 
+const sessionSecret = process.env.SESSION_SECRET ||
+    (process.env.NODE_ENV === 'production' ? '' : 'development-only-change-me');
+if (!sessionSecret) throw new Error('SESSION_SECRET is required in production');
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+
 app.use(session({
-    secret: 'nextread_secret_key',
+    secret: sessionSecret,
     resave: false,
-    saveUninitialized: true
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+    }
 }));
 
 // ส่งค่า user, isAdmin, cart ไปที่ทุกหน้า EJS
@@ -86,7 +104,7 @@ app.get('/', async (req, res) => {
             SELECT b.*, c.name AS category_name
             FROM books b
             LEFT JOIN categories c ON c.id = b.category_id
-            WHERE 1 = 1
+            WHERE b.is_active = 1
         `;
         const params = [];
 
@@ -121,7 +139,7 @@ app.get('/', async (req, res) => {
 // หน้ารายละเอียดหนังสือ
 app.get('/book/:id', async (req, res) => {
     try {
-        const [books] = await db.query('SELECT * FROM books WHERE id = ?', [req.params.id]);
+        const [books] = await db.query('SELECT * FROM books WHERE id = ? AND is_active = 1', [req.params.id]);
         if (books.length === 0) return res.status(404).send('ไม่พบหนังสือ');
         res.render('detail', { book: books[0] });
     } catch (err) {
@@ -145,9 +163,12 @@ app.post('/register', async (req, res) => {
     }
 
     try {
+        const passwordHash = await bcrypt.hash(password, 12);
+        const [[role]] = await db.query('SELECT id FROM roles WHERE role_name = ?', ['user']);
+        if (!role) throw new Error('ไม่พบ role user ในฐานข้อมูล');
         await db.query(
-            "INSERT INTO users (name, user_id, email, password, role) VALUES (?, ?, ?, ?, 'user')",
-            [name, user_id, email, password]
+            'INSERT INTO users (name, user_id, email, password, role_id) VALUES (?, ?, ?, ?, ?)',
+            [name, user_id, email, passwordHash, role.id]
         );
         res.redirect('/login');
     } catch (err) {
@@ -166,9 +187,22 @@ app.post('/login', async (req, res) => {
     const { user_id, password } = req.body;
 
     try {
-        const [rows] = await db.query('SELECT * FROM users WHERE user_id = ? AND password = ?', [user_id, password]);
+        const [rows] = await db.query(
+            `SELECT u.*, r.role_name AS role
+             FROM users u JOIN roles r ON r.id = u.role_id
+             WHERE u.user_id = ?`,
+            [user_id]
+        );
         if (rows.length > 0) {
             const user = rows[0];
+            const isHashed = /^\$2[aby]\$/.test(user.password);
+            const passwordMatches = isHashed
+                ? await bcrypt.compare(password, user.password)
+                : password === user.password;
+            if (!passwordMatches) return res.render('login', { error: 'User ID หรือรหัสผ่านไม่ถูกต้อง' });
+            if (!isHashed) {
+                await db.query('UPDATE users SET password = ? WHERE id = ?', [await bcrypt.hash(password, 12), user.id]);
+            }
             req.session.user = { id: user.id, name: user.name, email: user.email };
             req.session.isAdmin = (user.role === 'admin');
             res.redirect('/');
@@ -182,6 +216,27 @@ app.post('/login', async (req, res) => {
 });
 
 // ออกจากระบบ
+app.get('/profile', (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    res.render('profile', { error: null, success: null });
+});
+
+app.post('/profile', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    const email = typeof req.body.email === 'string' ? req.body.email.trim() : '';
+    if (!name || !email) return res.render('profile', { error: 'กรุณากรอกชื่อและอีเมล', success: null });
+    try {
+        await db.query('UPDATE users SET name = ?, email = ? WHERE id = ?', [name, email, req.session.user.id]);
+        req.session.user.name = name;
+        req.session.user.email = email;
+        res.render('profile', { error: null, success: 'บันทึกข้อมูลแล้ว' });
+    } catch (err) {
+        console.error(err);
+        res.status(400).render('profile', { error: 'อีเมลนี้ถูกใช้งานแล้วหรือข้อมูลไม่ถูกต้อง', success: null });
+    }
+});
+
 app.get('/logout', (req, res) => {
     req.session.destroy(() => {
         res.redirect('/');
@@ -199,7 +254,7 @@ app.post('/cart/add/:id', async (req, res) => {
     if (!req.session.cart) req.session.cart = [];
 
     try {
-        const [books] = await db.query('SELECT * FROM books WHERE id = ?', [bookId]);
+        const [books] = await db.query('SELECT * FROM books WHERE id = ? AND is_active = 1', [bookId]);
         if (books.length > 0) {
             const book = books[0];
             const existing = req.session.cart.find(item => item.id == bookId);
@@ -230,44 +285,72 @@ app.post('/cart/remove/:id', (req, res) => {
     res.redirect('/cart');
 });
 
+app.post('/cart/update/:id', (req, res) => {
+    const quantity = Number.parseInt(req.body.quantity, 10);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+        return res.redirect('/cart');
+    }
+    const item = (req.session.cart || []).find(cartItem => String(cartItem.id) === String(req.params.id));
+    if (item) item.quantity = quantity;
+    res.redirect('/cart');
+});
+
 // ชำระเงิน / ยืนยันคำสั่งซื้อ
 app.post('/checkout', async (req, res) => {
     if (!req.session.user) return res.redirect('/login');
     const cart = req.session.cart || [];
     if (cart.length === 0) return res.redirect('/');
 
-    const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const paymentMethod = ['mock_transfer', 'mock_qr', 'mock_wallet'].includes(req.body.payment_method)
+        ? req.body.payment_method
+        : 'mock_transfer';
+    const connection = await db.getConnection();
 
     try {
-        const [result] = await db.query(
-            'INSERT INTO orders (user_id, user_email, total_price) VALUES (?, ?, ?)',
+        await connection.beginTransaction();
+        const ids = cart.map(item => Number(item.id));
+        const [books] = await connection.query(
+            `SELECT id, title, price, ebook_url FROM books
+             WHERE is_active = 1 AND id IN (${ids.map(() => '?').join(',')}) FOR UPDATE`,
+            ids
+        );
+        if (books.length !== ids.length) throw new Error('มีหนังสือที่ไม่พร้อมขายในตะกร้า');
+        const bookById = new Map(books.map(book => [String(book.id), book]));
+        const totalPrice = cart.reduce((sum, item) => {
+            const book = bookById.get(String(item.id));
+            if (!book || !Number.isInteger(item.quantity) || item.quantity < 1) {
+                throw new Error('รายการในตะกร้าไม่ถูกต้อง');
+            }
+            return sum + Number(book.price) * item.quantity;
+        }, 0);
+        const [result] = await connection.query(
+            'INSERT INTO orders (user_id, user_email, total_price, status) VALUES (?, ?, ?, \'pending\')',
             [req.session.user.id, req.session.user.email, totalPrice]
         );
         const orderId = result.insertId;
 
-        // --- เพิ่มเติม: บันทึกข้อมูลการชำระเงินจำลองลงตาราง payments ---
-        await db.query(
+        await connection.query(
             'INSERT INTO payments (order_id, payment_method, amount) VALUES (?, ?, ?)',
-            [orderId, 'mock_transfer', totalPrice]
+            [orderId, paymentMethod, totalPrice]
         );
 
-        for (let item of cart) {
-            const [books] = await db.query('SELECT title, ebook_url FROM books WHERE id = ?', [item.id]);
-            const book = books[0] || {};
-            const bookTitle = item.title || book.title || 'E-Book';
-            const ebookUrl = book.ebook_url || item.ebook_url || '';
-
-            await db.query(
-                'INSERT INTO order_items (order_id, book_id, book_title, price, ebook_url) VALUES (?, ?, ?, ?, ?)',
-                [orderId, item.id, bookTitle, item.price, ebookUrl]
+        for (const item of cart) {
+            const book = bookById.get(String(item.id));
+            await connection.query(
+                'INSERT INTO order_items (order_id, book_id, book_title, quantity, price, ebook_url) VALUES (?, ?, ?, ?, ?, ?)',
+                [orderId, book.id, book.title, item.quantity, book.price, book.ebook_url]
             );
         }
 
+        await connection.commit();
         req.session.cart = [];
         res.redirect('/my-orders');
     } catch (err) {
+        await connection.rollback();
         console.error(err);
-        res.status(500).send('Checkout Error: ' + (err.sqlMessage || err.message));
+        res.status(400).send('Checkout Error: ' + (err.sqlMessage || err.message));
+    } finally {
+        connection.release();
     }
 });
 
@@ -280,9 +363,10 @@ app.get('/my-orders', async (req, res) => {
         for (let order of orders) {
             const [items] = await db.query(
                 `SELECT oi.*, COALESCE(b.title, oi.book_title) AS book_title,
-                    COALESCE(b.ebook_url, oi.ebook_url) AS ebook_url
+                    dl.token AS download_token
                  FROM order_items oi
                  LEFT JOIN books b ON oi.book_id = b.id
+                 LEFT JOIN download_links dl ON dl.order_item_id = oi.id
                  WHERE oi.order_id = ?`,
                 [order.id]
             );
@@ -301,10 +385,12 @@ app.get('/my-books', async (req, res) => {
 
     try {
         const [books] = await db.query(`
-            SELECT b.id, b.title, b.author, b.cover_image, b.ebook_url, MAX(o.created_at) as purchase_date
+                 SELECT b.id, b.title, b.author, b.cover_image, MIN(dl.token) AS download_token,
+                     MAX(o.created_at) as purchase_date
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
             JOIN books b ON oi.book_id = b.id
+                 JOIN download_links dl ON dl.order_item_id = oi.id
             WHERE o.user_id = ? AND o.status = 'approved'
             GROUP BY b.id, b.title, b.author, b.cover_image, b.ebook_url
             ORDER BY purchase_date DESC
@@ -323,10 +409,11 @@ app.get('/read/:id', async (req, res) => {
 
     try {
         const [rows] = await db.query(`
-            SELECT b.* 
+            SELECT b.*, dl.token AS download_token
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
             JOIN books b ON oi.book_id = b.id
+            JOIN download_links dl ON dl.order_item_id = oi.id
             WHERE o.user_id = ? AND b.id = ? AND o.status = 'approved'
         `, [req.session.user.id, req.params.id]);
 
@@ -338,6 +425,32 @@ app.get('/read/:id', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).send('Error opening ebook');
+    }
+});
+
+app.get('/download/:token', async (req, res) => {
+    if (!req.session.user) return res.redirect('/login');
+    try {
+        const [[download]] = await db.query(
+            `SELECT oi.ebook_url
+             FROM download_links dl
+             JOIN order_items oi ON oi.id = dl.order_item_id
+             JOIN orders o ON o.id = oi.order_id
+             WHERE dl.token = ? AND o.user_id = ? AND o.status = 'approved'`,
+            [req.params.token, req.session.user.id]
+        );
+        if (!download) return res.status(403).send('ไม่มีสิทธิ์ดาวน์โหลดรายการนี้');
+        if (download.ebook_url.startsWith('/private-ebooks/')) {
+            const filename = path.basename(download.ebook_url);
+            const filePath = path.join(__dirname, 'private', 'ebooks', filename);
+            if (!fs.existsSync(filePath)) return res.status(404).send('ไม่พบไฟล์ E-Book');
+            return res.download(filePath);
+        }
+        if (/^https:\/\//i.test(download.ebook_url)) return res.redirect(download.ebook_url);
+        return res.status(404).send('ไม่พบไฟล์ E-Book');
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Download Error');
     }
 });
 
@@ -358,19 +471,42 @@ app.get('/admin', async (req, res) => {
             books: bookCount.count || 0
         };
 
-        // 2. ดึงออเดอร์
-        const [orders] = await db.query('SELECT o.*, u.name as user_name, u.email FROM orders o JOIN users u ON o.user_id = u.id ORDER BY o.id DESC');
+        const searchQuery = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+        let orderSql = `
+            SELECT o.*, u.name AS user_name, u.email,
+                   p.payment_method, p.amount AS payment_amount, p.payment_date
+            FROM orders o
+            JOIN users u ON o.user_id = u.id
+            LEFT JOIN payments p ON p.order_id = o.id
+            WHERE 1 = 1`;
+        const orderParams = [];
+        if (searchQuery) {
+            orderSql += ` AND (CAST(o.id AS CHAR) LIKE ? OR u.name LIKE ?
+                OR u.email LIKE ? OR o.status LIKE ?)`;
+            const term = `%${searchQuery}%`;
+            orderParams.push(term, term, term, term);
+        }
+        orderSql += ' ORDER BY o.id DESC';
+        const [orders] = await db.query(orderSql, orderParams);
         for (let order of orders) {
-            const [items] = await db.query('SELECT oi.*, b.title as book_title FROM order_items oi JOIN books b ON oi.book_id = b.id WHERE oi.order_id = ?', [order.id]);
+            const [items] = await db.query(
+                `SELECT oi.*, COALESCE(b.title, oi.book_title) AS book_title
+                 FROM order_items oi LEFT JOIN books b ON oi.book_id = b.id
+                 WHERE oi.order_id = ?`,
+                [order.id]
+            );
             order.items = items || [];
         }
 
         // 3. ดึงหนังสือ หมวดหมู่ และผู้ใช้
         const [books] = await db.query('SELECT b.*, c.name as category_name FROM books b LEFT JOIN categories c ON b.category_id = c.id ORDER BY b.id DESC');
         const [categories] = await db.query('SELECT * FROM categories ORDER BY id DESC');
-        const [users] = await db.query('SELECT id, name, user_id, email, role FROM users ORDER BY id DESC');
+        const [users] = await db.query(
+            `SELECT u.id, u.name, u.user_id, u.email, r.role_name AS role
+             FROM users u JOIN roles r ON r.id = u.role_id ORDER BY u.id DESC`
+        );
 
-        res.render('admin', { orders, books, categories, users, dashboard });
+        res.render('admin', { orders, books, categories, users, dashboard, searchQuery });
     } catch (err) {
         console.error(err);
         res.status(500).send('Admin Error');
@@ -385,11 +521,11 @@ app.post('/admin/books/add', upload.fields([
     if (!req.session.isAdmin) return res.redirect('/');
     const { title, author, price, description, category_id } = req.body;
     const coverImage = req.files['cover_image'] ? '/uploads/' + req.files['cover_image'][0].filename : (req.body.cover_url || '');
-    const ebookUrl = req.files['ebook_file'] ? '/uploads/' + req.files['ebook_file'][0].filename : (req.body.ebook_url || '');
+    const ebookUrl = req.files['ebook_file'] ? '/private-ebooks/' + req.files['ebook_file'][0].filename : (req.body.ebook_url || '');
 
     try {
         await db.query(
-            'INSERT INTO books (title, author, price, description, cover_image, ebook_url, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO books (title, author, price, description, cover_image, ebook_url, category_id, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, 1)',
             [title, author, price, description, coverImage, ebookUrl, category_id || null]
         );
         res.redirect('/admin');
@@ -423,7 +559,7 @@ app.post('/admin/users/role/:id', async (req, res) => {
 
     try {
         await db.query(
-            'UPDATE users SET role = ? WHERE id = ?',
+            'UPDATE users SET role_id = (SELECT id FROM roles WHERE role_name = ?) WHERE id = ?',
             [role, req.params.id]
         );
         res.redirect('/admin');
@@ -511,7 +647,7 @@ app.post(['/admin/books/edit/:id', '/admin/edit/:id'], upload.fields([
         ? '/uploads/' + req.files.cover_image[0].filename
         : (current_cover || '');
     const ebookUrl = req.files?.ebook_file?.[0]
-        ? '/uploads/' + req.files.ebook_file[0].filename
+        ? '/private-ebooks/' + req.files.ebook_file[0].filename
         : (current_ebook || '');
 
     try {
@@ -546,11 +682,23 @@ app.post('/admin/books/delete/:id', async (req, res) => {
     if (!req.session.isAdmin) return res.redirect('/');
 
     try {
-        await db.query('DELETE FROM books WHERE id = ?', [req.params.id]);
+        await db.query('UPDATE books SET is_active = 0 WHERE id = ?', [req.params.id]);
         res.redirect('/admin');
     } catch (err) {
         console.error(err);
         res.status(500).send('Error deleting book');
+    }
+});
+
+app.post('/admin/books/status/:id', async (req, res) => {
+    if (!req.session.isAdmin) return res.redirect('/');
+    const isActive = req.body.is_active === '1' ? 1 : 0;
+    try {
+        await db.query('UPDATE books SET is_active = ? WHERE id = ?', [isActive, req.params.id]);
+        res.redirect('/admin');
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('เปลี่ยนสถานะหนังสือไม่สำเร็จ');
     }
 });
 
@@ -560,8 +708,11 @@ app.post(['/admin/approve-order/:id', '/admin/orders/approve/:id'], async (req, 
     const orderId = req.params.id;
 
     try {
-        // 1. อนุมัติสถานะออเดอร์ในฐานข้อมูลก่อน
-        await db.query("UPDATE orders SET status = 'approved' WHERE id = ?", [orderId]);
+        const [approval] = await db.query(
+            "UPDATE orders SET status = 'approved' WHERE id = ? AND status = 'pending'",
+            [orderId]
+        );
+        if (!approval.affectedRows) return res.redirect('/admin');
 
         // --- เพิ่มเติม: สร้าง Token ลิงก์ดาวน์โหลดบันทึกลงฐานข้อมูล ---
         const [orderItems] = await db.query('SELECT id FROM order_items WHERE order_id = ?', [orderId]);
@@ -588,19 +739,21 @@ app.post(['/admin/approve-order/:id', '/admin/orders/approve/:id'], async (req, 
                     const order = orderRows[0];
                     const [items] = await db.query(
                         `SELECT oi.*, COALESCE(b.title, oi.book_title) AS book_title,
-                            COALESCE(b.ebook_url, oi.ebook_url) AS ebook_url
+                            dl.token AS download_token
                          FROM order_items oi
                          LEFT JOIN books b ON oi.book_id = b.id
+                         JOIN download_links dl ON dl.order_item_id = oi.id
                          WHERE oi.order_id = ?`,
                         [order.id]
                     );
 
                     let itemsHtml = items.map(function(item) {
+                        const downloadUrl = req.protocol + '://' + req.get('host') + '/download/' + item.download_token;
                         return '<tr style="border-bottom: 1px solid #e2e8f0;">' +
                             '<td style="padding: 10px; font-weight: bold;">' + (item.book_title || 'E-Book') + '</td>' +
                             '<td style="padding: 10px; text-align: center;">฿' + item.price + '</td>' +
                             '<td style="padding: 10px; text-align: right;">' +
-                            '<a href="' + (item.ebook_url || '#') + '" target="_blank" style="background: #2563eb; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-weight: bold;"> อ่าน / ดาวน์โหลด</a>' +
+                            '<a href="' + downloadUrl + '" style="background: #2563eb; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; font-weight: bold;"> อ่าน / ดาวน์โหลด</a>' +
                             '</td>' +
                             '</tr>';
                     }).join('');
@@ -634,13 +787,13 @@ app.post(['/admin/approve-order/:id', '/admin/orders/approve/:id'], async (req, 
                         '</div>';
 
                     let mailOptions = {
-                        from: '"NEXTREAD E-Book Store" <' + (process.env.EMAIL_USER || 'flukesingkham@gmail.com') + '>',
+                        from: '"NEXTREAD E-Book Store" <' + (process.env.EMAIL_USER || 'no-reply@nextread.local') + '>',
                         to: order.email,
                         subject: '[ใบเสร็จ & ลิงก์อ่านหนังสือ] คำสั่งซื้อ #' + order.id + ' ได้รับการอนุมัติแล้ว',
                         html: emailContent
                     };
 
-                    await transporter.sendMail(mailOptions);
+                    if (transporter) await transporter.sendMail(mailOptions);
                 }
             } catch (emailErr) {
                 console.error('Background Email Failed:', emailErr);
@@ -656,6 +809,16 @@ app.post(['/admin/approve-order/:id', '/admin/orders/approve/:id'], async (req, 
 });
 
 // --- 7. START SERVER ---
+app.get('/health', async (req, res) => {
+    try {
+        await db.query('SELECT 1');
+        res.json({ status: 'ok' });
+    } catch (err) {
+        console.error('Health check database error:', err.message);
+        res.status(503).json({ status: 'unavailable' });
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log('Server running at http://localhost:' + PORT);

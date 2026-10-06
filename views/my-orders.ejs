@@ -151,8 +151,10 @@
                         <div>
                             <% if (order.status === 'approved') { %>
                                 <span class="status-approved">✅ ชำระเงินแล้ว (อนุมัติแล้ว)</span>
-                            <% } else { %>
+                            <% } else if (order.status === 'pending') { %>
                                 <span class="status-pending">⏳ รอผู้ดูแลระบบตรวจสอบ</span>
+                            <% } else { %>
+                                <span>ยกเลิกคำสั่งซื้อ</span>
                             <% } %>
                         </div>
                     </div>
@@ -164,7 +166,9 @@
                                     <strong><%= item.book_title %></strong>
                                     <% if (order.status === 'approved') { %>
                                         <br>
-                                        <a href="<%= item.ebook_url %>" target="_blank" class="download-btn">📖 คลิกอ่าน / ดาวน์โหลด E-Book</a>
+                                        <% if (item.download_token) { %>
+                                            <a href="/download/<%= item.download_token %>" class="download-btn">คลิกอ่าน / ดาวน์โหลด E-Book</a>
+                                        <% } %>
                                     <% } %>
                                 </div>
                                 <div>฿<%= item.price %></div>

@@ -128,10 +128,17 @@
                             <td><img src="<%= item.cover_image %>" class="book-img" alt="<%= item.title %>"></td>
                             <td><strong><%= item.title %></strong></td>
                             <td>฿<%= item.price.toLocaleString() %></td>
-                            <td><%= item.quantity %></td>
+                            <td>
+                                <form action="/cart/update/<%= item.id %>" method="POST">
+                                    <input class="qty-input" type="number" name="quantity" min="1" max="99" value="<%= item.quantity %>" aria-label="จำนวน">
+                                    <button type="submit">ปรับจำนวน</button>
+                                </form>
+                            </td>
                             <td><strong>฿<%= subtotal.toLocaleString() %></strong></td>
                             <td>
-                                <a href="/cart/remove/<%= item.id %>" class="btn-danger" onclick="return confirm('ต้องการลบรายการนี้ใช่หรือไม่?')">ลบ</a>
+                                <form action="/cart/remove/<%= item.id %>" method="POST" onsubmit="return confirm('ต้องการลบรายการนี้ใช่หรือไม่?')">
+                                    <button type="submit" class="btn-danger">ลบ</button>
+                                </form>
                             </td>
                         </tr>
                     <% }); %>
@@ -142,8 +149,14 @@
                 <div>รวมรายการสั่งซื้อทั้งหมด</div>
                 <div class="total-price">฿<%= total.toLocaleString() %> บาท</div>
                 <form action="/checkout" method="POST">
+                    <label for="payment_method">วิธีชำระเงิน (จำลอง)</label>
+                    <select id="payment_method" name="payment_method">
+                        <option value="mock_transfer">โอนเงินจำลอง</option>
+                        <option value="mock_qr">QR จำลอง</option>
+                        <option value="mock_wallet">กระเป๋าเงินจำลอง</option>
+                    </select>
                     <a href="/" class="btn-secondary">ซื้อสินค้าต่อ</a>
-                    <button type="submit" class="btn-checkout">🎉 ยืนยันการสั่งซื้อ</button>
+                    <button type="submit" class="btn-checkout">ยืนยันการสั่งซื้อ</button>
                 </form>
             </div>
         <% } %>

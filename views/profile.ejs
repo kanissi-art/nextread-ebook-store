@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ข้อมูลสมาชิก - NEXTREAD</title>
+</head>
+<body>
+    <main>
+        <h1>ข้อมูลสมาชิก</h1>
+        <% if (error) { %><p role="alert"><%= error %></p><% } %>
+        <% if (success) { %><p role="status"><%= success %></p><% } %>
+        <form action="/profile" method="POST">
+            <label for="name">ชื่อ</label>
+            <input id="name" name="name" value="<%= user.name %>" required maxlength="100">
+            <label for="email">อีเมล</label>
+            <input id="email" name="email" type="email" value="<%= user.email %>" required maxlength="100">
+            <button type="submit">บันทึกข้อมูล</button>
+        </form>
+        <a href="/my-orders">ประวัติคำสั่งซื้อ</a>
+    </main>
+</body>
+</html>

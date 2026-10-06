@@ -47,9 +47,9 @@
                                 <i class="fa-solid fa-book-open-reader"></i> อ่านออนไลน์
                             </a>
                             <!-- ปุ่มดาวน์โหลด PDF (แบบจำลอง) -->
-                            <button onclick="alert('ดาวน์โหลดไฟล์ PDF ของหนังสือ &quot;<%= book.title %>&quot; สำเร็จ!')" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer">
+                            <a href="/download/<%= book.download_token %>" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition cursor-pointer">
                                 <i class="fa-solid fa-file-arrow-down"></i> ดาวน์โหลด PDF
-                            </button>
+                            </a>
                         </div>
                     </div>
                 <% }); %>
